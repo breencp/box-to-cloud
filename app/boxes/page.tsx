@@ -3,14 +3,14 @@
 import { Amplify } from "aws-amplify";
 import outputs from "@/amplify_outputs.json";
 import { AppLayout } from "@/app/components";
-import { ReviewPage } from "@/app/components";
+import { BoxListPage } from "@/app/components";
 
 Amplify.configure(outputs);
 
-export default function Home() {
+export default function Boxes() {
   return (
-    <AppLayout activePage="review">
-      <ReviewPage />
+    <AppLayout activePage="boxes">
+      <BoxListPage />
     </AppLayout>
   );
 }

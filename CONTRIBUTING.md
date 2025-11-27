@@ -1,59 +1,65 @@
-# Contributing Guidelines
+# Contributing to DocSense Cloud
 
-Thank you for your interest in contributing to our project. Whether it's a bug report, new feature, correction, or additional
-documentation, we greatly value feedback and contributions from our community.
+Thank you for your interest in contributing to DocSense Cloud! This document provides guidelines for contributing to the project.
 
-Please read through this document before submitting any issues or pull requests to ensure we have all the necessary
-information to effectively respond to your bug report or contribution.
+## Getting Started
 
+1. Fork the repository
+2. Clone your fork locally
+3. Install dependencies with `npm install`
+4. Create a new branch for your changes
 
-## Reporting Bugs/Feature Requests
+## Development Workflow
 
-We welcome you to use the GitHub issue tracker to report bugs or suggest features.
+### Setting Up Your Environment
 
-When filing an issue, please check existing open, or recently closed, issues to make sure somebody else hasn't already
-reported the issue. Please try to include as much information as you can. Details like these are incredibly useful:
+1. Ensure you have Node.js 20 or later installed
+2. Run `npm install` to install dependencies
+3. Run `npm run dev` to start the development server
+4. The app will be available at `http://localhost:3000`
 
-* A reproducible test case or series of steps
-* The version of our code being used
-* Any modifications you've made relevant to the bug
-* Anything unusual about your environment or deployment
+### Making Changes
 
+1. Create a new branch from `main`:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
 
-## Contributing via Pull Requests
-Contributions via pull requests are much appreciated. Before sending us a pull request, please ensure that:
+2. Make your changes following the code style guidelines below
 
-1. You are working against the latest source on the *main* branch.
-2. You check existing open, and recently merged, pull requests to make sure someone else hasn't addressed the problem already.
-3. You open an issue to discuss any significant work - we would hate for your time to be wasted.
+3. Test your changes locally
 
-To send us a pull request, please:
+4. Commit your changes with clear, descriptive commit messages
 
-1. Fork the repository.
-2. Modify the source; please focus on the specific change you are contributing. If you also reformat all the code, it will be hard for us to focus on your change.
-3. Ensure local tests pass.
-4. Commit to your fork using clear commit messages.
-5. Send us a pull request, answering any default questions in the pull request interface.
-6. Pay attention to any automated CI failures reported in the pull request, and stay involved in the conversation.
+### Code Style
 
-GitHub provides additional document on [forking a repository](https://help.github.com/articles/fork-a-repo/) and
-[creating a pull request](https://help.github.com/articles/creating-a-pull-request/).
+- Use TypeScript for all new code
+- Follow the existing code patterns and structure
+- Use CSS Modules for component styling
+- Keep components small and focused
+- Add types for all props and state
 
+### Submitting Changes
 
-## Finding contributions to work on
-Looking at the existing issues is a great way to find something to contribute on. As our projects, by default, use the default GitHub issue labels (enhancement/bug/duplicate/help wanted/invalid/question/wontfix), looking at any 'help wanted' issues is a great place to start.
+1. Push your branch to your fork
+2. Create a Pull Request against the `main` branch
+3. Provide a clear description of your changes
+4. Link any related issues
 
+## Reporting Issues
+
+When reporting issues, please include:
+
+- A clear description of the problem
+- Steps to reproduce the issue
+- Expected vs actual behavior
+- Screenshots if applicable
+- Browser and OS information
 
 ## Code of Conduct
-This project has adopted the [Amazon Open Source Code of Conduct](https://aws.github.io/code-of-conduct).
-For more information see the [Code of Conduct FAQ](https://aws.github.io/code-of-conduct-faq) or contact
-opensource-codeofconduct@amazon.com with any additional questions or comments.
 
+Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
-## Security issue notifications
-If you discover a potential security issue in this project we ask that you notify AWS/Amazon Security via our [vulnerability reporting page](http://aws.amazon.com/security/vulnerability-reporting/). Please do **not** create a public github issue.
+## License
 
-
-## Licensing
-
-See the [LICENSE](LICENSE) file for our project's licensing. We will ask you to confirm the licensing of your contribution.
+By contributing to DocSense Cloud, you agree that your contributions will be licensed under the MIT License.
