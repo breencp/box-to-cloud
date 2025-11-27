@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 100 100"
+     stroke="#0A64B0"
+     stroke-width="6"
+     fill="none"
+     stroke-linecap="round"
+     stroke-linejoin="round">
+
+    <!-- Cloud above box -->
+    <path d="
+    M30 32
+    a12 12 0 0 1 23 -6
+    a10 10 0 0 1 17 8
+    a11 11 0 0 1 -11 11
+    H31
+    a11 11 0 0 1 -1 -22
+  " />
+
+    <!-- Box top (perfectly centered) -->
+    <polygon points="
+    50 55
+    25 45
+    50 35
+    75 45
+  " />
+
+    <!-- Left wall -->
+    <polygon points="
+    25 45
+    25 70
+    50 85
+    50 55
+  " />
+
+    <!-- Right wall -->
+    <polygon points="
+    75 45
+    75 70
+    50 85
+    50 55
+  " />
+</svg>

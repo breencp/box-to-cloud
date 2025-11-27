@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getUrl } from "aws-amplify/storage";
 
 interface PageImageProps {
   s3Key: string;
@@ -10,16 +11,53 @@ interface PageImageProps {
 export function PageImage({ s3Key, filename }: PageImageProps) {
   const [zoom, setZoom] = useState(1);
   const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   const handleZoomIn = () => setZoom((z) => Math.min(z + 0.25, 3));
   const handleZoomOut = () => setZoom((z) => Math.max(z - 0.25, 0.5));
   const handleReset = () => setZoom(1);
 
-  if (error) {
+  useEffect(() => {
+    async function fetchImageUrl() {
+      setLoading(true);
+      setError(false);
+
+      try {
+        const result = await getUrl({
+          path: s3Key,
+          options: {
+            expiresIn: 3600,
+          },
+        });
+        setImageUrl(result.url.toString());
+      } catch (err) {
+        console.error("Error fetching image URL:", err);
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (s3Key) {
+      fetchImageUrl();
+    }
+  }, [s3Key]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 p-8 text-gray-500 dark:text-gray-400">
+        <p>Loading image...</p>
+      </div>
+    );
+  }
+
+  if (error || !imageUrl) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 p-8 text-gray-500 dark:text-gray-400">
         <p>Unable to load image</p>
         <p className="font-mono text-xs break-all">{filename}</p>
+        <p className="font-mono text-xs break-all text-gray-400">{s3Key}</p>
       </div>
     );
   }
@@ -55,18 +93,12 @@ export function PageImage({ s3Key, filename }: PageImageProps) {
           className="transition-transform duration-200 origin-center"
           style={{ transform: `scale(${zoom})` }}
         >
-          {/*
-            Note: In production, replace this with an actual <img> tag
-            pointing to the presigned S3 URL. For the initial setup,
-            we show a placeholder since the images aren't uploaded yet.
-          */}
-          <div className="flex flex-col items-center justify-center gap-4 p-16 bg-white dark:bg-gray-800 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg text-gray-500 dark:text-gray-400 text-center min-w-[400px] min-h-[500px] max-sm:min-w-full max-sm:min-h-[300px] max-sm:p-8">
-            <p>Document Page Preview</p>
-            <p className="font-mono text-xs break-all">{s3Key}</p>
-            <p className="text-xs italic">
-              Images will be displayed here once uploaded to S3
-            </p>
-          </div>
+          <img
+            src={imageUrl}
+            alt={filename}
+            className="max-w-full shadow-lg"
+            onError={() => setError(true)}
+          />
         </div>
       </div>
     </div>
