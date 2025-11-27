@@ -1,15 +1,16 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 
 /**
- * DocSense Cloud - Document Retention Review Application
+ * Box to Cloud - Document Retention Review Application
  *
  * Data schema for managing document page reviews.
+ * All model names prefixed with "Box2Cloud" for easy identification in AWS Console.
  * See CLOUD_MIGRATION_SPEC.md for detailed entity definitions.
  */
 
 const schema = a.schema({
   // Box entity - represents a physical box of scanned documents
-  Box: a
+  Box2CloudBox: a
     .model({
       boxNumber: a.string().required(),
       tenantId: a.string().required(),
@@ -27,7 +28,7 @@ const schema = a.schema({
     .authorization((allow) => [allow.authenticated()]),
 
   // Document entity - represents a single PDF file within a box
-  Document: a
+  Box2CloudDocument: a
     .model({
       docId: a.string().required(),
       boxId: a.id().required(),
@@ -43,7 +44,7 @@ const schema = a.schema({
     .authorization((allow) => [allow.authenticated()]),
 
   // Page entity - represents a single page within a document (primary review entity)
-  Page: a
+  Box2CloudPage: a
     .model({
       pageId: a.string().required(),
       docId: a.string().required(),
@@ -67,7 +68,7 @@ const schema = a.schema({
     .authorization((allow) => [allow.authenticated()]),
 
   // UserReview entity - tracks what each user has reviewed (audit trail)
-  UserReview: a
+  Box2CloudUserReview: a
     .model({
       userId: a.string().required(),
       tenantId: a.string().required(),

@@ -28,7 +28,7 @@ export function BoxListPage() {
   useEffect(() => {
     async function fetchBoxes() {
       try {
-        const { data } = await client.models.Box.list();
+        const { data } = await client.models.Box2CloudBox.list();
         if (data) {
           setBoxes(
             data.map((box) => ({

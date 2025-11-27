@@ -35,7 +35,7 @@ export function ReviewPage() {
     setError(null);
 
     try {
-      const { data: pages } = await client.models.Page.list({
+      const { data: pages } = await client.models.Box2CloudPage.list({
         filter: {
           reviewStatus: { eq: "pending" },
         },
@@ -52,7 +52,7 @@ export function ReviewPage() {
         };
 
         if (page.boxId) {
-          const { data: box } = await client.models.Box.get({ id: page.boxId });
+          const { data: box } = await client.models.Box2CloudBox.get({ id: page.boxId });
           if (box) {
             boxInfo = {
               boxNumber: box.boxNumber || "",
@@ -98,14 +98,14 @@ export function ReviewPage() {
     setError(null);
 
     try {
-      await client.models.Page.update({
+      await client.models.Box2CloudPage.update({
         id: currentPage.id,
         reviewStatus: decision,
         reviewedAt: new Date().toISOString(),
       });
 
       if (currentPage.boxId) {
-        const { data: box } = await client.models.Box.get({
+        const { data: box } = await client.models.Box2CloudBox.get({
           id: currentPage.boxId,
         });
         if (box) {
@@ -135,7 +135,7 @@ export function ReviewPage() {
             updateData.status = "in_progress";
           }
 
-          await client.models.Box.update(updateData);
+          await client.models.Box2CloudBox.update(updateData);
         }
       }
 

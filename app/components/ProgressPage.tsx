@@ -27,7 +27,7 @@ export function ProgressPage() {
   useEffect(() => {
     async function fetchProgress() {
       try {
-        const { data } = await client.models.Box.list();
+        const { data } = await client.models.Box2CloudBox.list();
         if (data) {
           setBoxes(
             data.map((box) => ({
