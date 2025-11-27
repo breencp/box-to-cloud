@@ -1,6 +1,9 @@
 version: 1
 backend:
   phases:
+    preBuild:
+      commands:
+        - nvm use 22
     build:
       commands:
         - npm ci --cache .npm --prefer-offline
