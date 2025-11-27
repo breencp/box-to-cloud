@@ -5,6 +5,9 @@
   "engines": {
     "node": ">=22.0.0"
   },
+  "overrides": {
+    "esbuild": "^0.25.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -21,6 +24,7 @@
   "devDependencies": {
     "@aws-amplify/backend": "^1.18.0",
     "@aws-amplify/backend-cli": "^1.8.0",
+    "esbuild": "^0.25.0",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^20",
     "@types/react": "^18",
