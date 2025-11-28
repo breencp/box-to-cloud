@@ -10,13 +10,13 @@ import { PageImage } from "./PageImage";
 import type { ReviewDecision } from "../types";
 
 const client = generateClient<Schema>();
-const TENANT_ID = "default";
 
 interface CurrentPage {
   id: string;
   pageId: string;
   boxId: string;
   setId: string;
+  tenantId: string;
   pageNumber: number;
   filename: string;
   s3Key: string;
@@ -104,6 +104,7 @@ export function ReviewPage() {
           pageId: page.pageId,
           boxId: page.boxId || "",
           setId: page.setId || "",
+          tenantId: page.tenantId || "",
           pageNumber: page.pageNumber,
           filename: page.filename,
           s3Key: page.s3Key,
@@ -283,7 +284,7 @@ export function ReviewPage() {
     <div className="flex h-full flex-1">
       {/* Left side - Image (maximum real estate) */}
       <div className="flex-1 flex items-center justify-center overflow-auto bg-gray-50 dark:bg-gray-900 p-4">
-        <PageImage s3Key={currentPage.s3Key} filename={currentPage.filename} />
+        <PageImage s3Key={currentPage.s3Key} tenantId={currentPage.tenantId} filename={currentPage.filename} />
       </div>
 
       {/* Right side - Context and Controls */}

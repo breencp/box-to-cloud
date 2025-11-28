@@ -1,16 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getUrl } from "aws-amplify/storage";
+import { generateClient } from "aws-amplify/data";
+import type { Schema } from "@/amplify/data/resource";
+
+const client = generateClient<Schema>();
 
 interface PageImageProps {
   s3Key: string;
+  tenantId: string;
   filename: string;
 }
 
-export function PageImage({ s3Key, filename }: PageImageProps) {
+export function PageImage({ s3Key, tenantId, filename }: PageImageProps) {
   const [zoom, setZoom] = useState(1);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
@@ -21,28 +25,43 @@ export function PageImage({ s3Key, filename }: PageImageProps) {
   useEffect(() => {
     async function fetchImageUrl() {
       setLoading(true);
-      setError(false);
+      setError(null);
 
       try {
-        const result = await getUrl({
-          path: s3Key,
-          options: {
-            expiresIn: 3600,
-          },
+        const { data, errors } = await client.queries.getPageImageUrl({
+          s3Key,
+          tenantId,
         });
-        setImageUrl(result.url.toString());
+
+        if (errors && errors.length > 0) {
+          console.error("GraphQL errors:", errors);
+          setError("Failed to load image");
+          return;
+        }
+
+        if (data?.error) {
+          console.error("Authorization error:", data.error);
+          setError(data.error);
+          return;
+        }
+
+        if (data?.url) {
+          setImageUrl(data.url);
+        } else {
+          setError("No URL returned");
+        }
       } catch (err) {
         console.error("Error fetching image URL:", err);
-        setError(true);
+        setError("Failed to load image");
       } finally {
         setLoading(false);
       }
     }
 
-    if (s3Key) {
+    if (s3Key && tenantId) {
       fetchImageUrl();
     }
-  }, [s3Key]);
+  }, [s3Key, tenantId]);
 
   if (loading) {
     return (
@@ -55,9 +74,8 @@ export function PageImage({ s3Key, filename }: PageImageProps) {
   if (error || !imageUrl) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 p-8 text-gray-500 dark:text-gray-400">
-        <p>Unable to load image</p>
+        <p>{error || "Unable to load image"}</p>
         <p className="font-mono text-xs break-all">{filename}</p>
-        <p className="font-mono text-xs break-all text-gray-400">{s3Key}</p>
       </div>
     );
   }

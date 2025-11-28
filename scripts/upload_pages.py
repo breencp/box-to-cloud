@@ -89,10 +89,11 @@ def parse_pdf_filename(filename: str) -> dict | None:
     }
 
 
-def get_existing_s3_keys(s3_client, bucket: str, prefix: str = "pages/") -> set:
-    """Get all existing S3 keys under the given prefix."""
+def get_existing_s3_keys(s3_client, bucket: str, tenant_id: str) -> set:
+    """Get all existing S3 keys under the tenant prefix."""
     existing_keys = set()
     paginator = s3_client.get_paginator("list_objects_v2")
+    prefix = f"{tenant_id}/"
 
     print(f"Fetching existing S3 objects from {bucket}/{prefix}...")
 
@@ -424,8 +425,9 @@ def process_pdf(pdf_path: Path, pdf_info: dict, s3_client, dynamodb,
     )
 
     # Upload each page
+    # S3 path: {tenant}/{box}/{set}/page_xxxx.png
     for page_num, image in enumerate(images, start=1):
-        s3_key = f"pages/{box_number}/{set_id}/page_{page_num:04d}.png"
+        s3_key = f"{TENANT_ID}/{box_number}/{set_id}/page_{page_num:04d}.png"
         page_id = f"{set_id}_page_{page_num:04d}"
 
         if s3_key not in existing_s3_keys:
@@ -579,7 +581,7 @@ def main():
     print(f"Using S3 bucket: {S3_BUCKET}")
 
     # Get existing data
-    existing_s3_keys = get_existing_s3_keys(s3_client, S3_BUCKET)
+    existing_s3_keys = get_existing_s3_keys(s3_client, S3_BUCKET, TENANT_ID)
     existing_sets = get_existing_sets(dynamodb, tables["set"])
     if force_upload:
         print("Force mode: will delete and re-upload existing files")
