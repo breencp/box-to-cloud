@@ -53,7 +53,10 @@ export function ReviewPage() {
       const pendingPages = (allPages?.filter(p => p.reviewStatus === "pending") || [])
         .sort((a, b) => {
           // Sort by setId first (contains box number), then by page number
-          const setCompare = a.setId.localeCompare(b.setId);
+          // Handle legacy data that might have docId instead of setId
+          const aSetId = a.setId || "";
+          const bSetId = b.setId || "";
+          const setCompare = aSetId.localeCompare(bSetId);
           if (setCompare !== 0) return setCompare;
           return a.pageNumber - b.pageNumber;
         });
@@ -100,7 +103,7 @@ export function ReviewPage() {
           id: page.id,
           pageId: page.pageId,
           boxId: page.boxId || "",
-          setId: page.setId,
+          setId: page.setId || "",
           pageNumber: page.pageNumber,
           filename: page.filename,
           s3Key: page.s3Key,
@@ -152,7 +155,7 @@ export function ReviewPage() {
         tenantId: TENANT_ID,
         pageId: currentPage.pageId,
         boxNumber: currentPage.boxNumber || "",
-        setId: currentPage.setId,
+        setId: currentPage.setId || "",
         pageNumber: currentPage.pageNumber,
         decision,
       });

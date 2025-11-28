@@ -1,19 +1,87 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 
 /**
- * Box to Cloud - Document Retention Review Application
+ * Box to Cloud - Page Retention Review Application
  *
- * Data schema for managing page reviews.
+ * Data schema for managing page reviews with multi-tenant support.
  * All model names prefixed with "Box2Cloud" for easy identification in AWS Console.
- * See CLOUD_MIGRATION_SPEC.md for detailed entity definitions.
  */
 
 const schema = a.schema({
+  // Tenant entity - represents an AOAO/building
+  Box2CloudTenant: a
+    .model({
+      name: a.string().required(),
+      address: a.string(),
+      isActive: a.boolean().default(true),
+    })
+    .authorization((allow) => [
+      allow.groups(["admin"]),
+      allow.authenticated().to(["read"]),
+    ]),
+
+  // User entity - user profile information
+  Box2CloudUser: a
+    .model({
+      cognitoId: a.string().required(),
+      email: a.string().required(),
+      fullName: a.string().required(),
+      title: a.enum(["president", "vice_president", "secretary", "treasurer", "director", "member"]),
+    })
+    .secondaryIndexes((index) => [
+      index("cognitoId").name("byCognitoId"),
+      index("email").name("byEmail"),
+    ])
+    .authorization((allow) => [
+      allow.groups(["admin"]),
+      allow.authenticated().to(["read"]),
+      allow.owner().to(["read", "update"]),
+    ]),
+
+  // UserTenant entity - links users to tenants with roles
+  Box2CloudUserTenant: a
+    .model({
+      userId: a.id().required(),
+      tenantId: a.id().required(),
+      role: a.enum(["viewer", "reviewer", "admin"]).required(),
+      isActive: a.boolean().default(true),
+    })
+    .secondaryIndexes((index) => [
+      index("userId").name("byUser"),
+      index("tenantId").name("byTenant"),
+    ])
+    .authorization((allow) => [
+      allow.groups(["admin"]),
+      allow.authenticated().to(["read"]),
+    ]),
+
+  // Invite entity - pending user invitations
+  Box2CloudInvite: a
+    .model({
+      email: a.string().required(),
+      tenantId: a.id().required(),
+      role: a.enum(["viewer", "reviewer", "admin"]).required(),
+      fullName: a.string(),
+      title: a.enum(["president", "vice_president", "secretary", "treasurer", "director", "member"]),
+      invitedBy: a.string().required(),
+      expiresAt: a.datetime().required(),
+      acceptedAt: a.datetime(),
+      status: a.enum(["pending", "accepted", "expired", "revoked"]).default("pending"),
+    })
+    .secondaryIndexes((index) => [
+      index("email").name("byEmail"),
+      index("tenantId").name("byTenant"),
+    ])
+    .authorization((allow) => [
+      allow.groups(["admin"]),
+      allow.authenticated().to(["read"]),
+    ]),
+
   // Box entity - represents a physical box of scanned documents
   Box2CloudBox: a
     .model({
       boxNumber: a.string().required(),
-      tenantId: a.string().required(),
+      tenantId: a.id().required(),
       totalSets: a.integer().default(0),
       totalPages: a.integer().default(0),
       pagesReviewed: a.integer().default(0),
