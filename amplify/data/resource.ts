@@ -97,6 +97,7 @@ const schema = a.schema({
 
   // Box entity - represents a physical box of scanned documents
   // Authorization: tenant viewers can read, tenant reviewers can read/update
+  // Note: tenantViewerGroup, tenantReviewerGroup, tenantAdminGroup fields are created implicitly by groupsDefinedIn
   Box2CloudBox: a
     .model({
       boxNumber: a.string().required(),
@@ -108,11 +109,6 @@ const schema = a.schema({
       pagesUnsure: a.integer().default(0),
       pagesRetain: a.integer().default(0),
       status: a.enum(["pending", "in_progress", "complete"]),
-      // Groups for tenant-based authorization
-      // Values: "tenant_{tenantId}_viewer", "tenant_{tenantId}_reviewer", "tenant_{tenantId}_admin"
-      tenantViewerGroup: a.string(),
-      tenantReviewerGroup: a.string(),
-      tenantAdminGroup: a.string(),
     })
     .secondaryIndexes((index) => [
       index("tenantId").sortKeys(["boxNumber"]).name("byTenant"),
@@ -125,6 +121,7 @@ const schema = a.schema({
     ]),
 
   // Set entity - represents a batch of scanned pages (one PDF file)
+  // Note: tenantViewerGroup, tenantReviewerGroup, tenantAdminGroup fields are created implicitly by groupsDefinedIn
   Box2CloudSet: a
     .model({
       setId: a.string().required(),
@@ -133,9 +130,6 @@ const schema = a.schema({
       filename: a.string().required(),
       pageCount: a.integer().default(0),
       pagesReviewed: a.integer().default(0),
-      tenantViewerGroup: a.string(),
-      tenantReviewerGroup: a.string(),
-      tenantAdminGroup: a.string(),
     })
     .secondaryIndexes((index) => [
       index("boxId").sortKeys(["setId"]).name("byBox"),
@@ -149,6 +143,7 @@ const schema = a.schema({
     ]),
 
   // Page entity - represents a single page within a set (primary review entity)
+  // Note: tenantViewerGroup, tenantReviewerGroup, tenantAdminGroup fields are created implicitly by groupsDefinedIn
   Box2CloudPage: a
     .model({
       pageId: a.string().required(),
@@ -163,9 +158,6 @@ const schema = a.schema({
       reviewedAt: a.datetime(),
       lockedBy: a.string(),
       lockedAt: a.datetime(),
-      tenantViewerGroup: a.string(),
-      tenantReviewerGroup: a.string(),
-      tenantAdminGroup: a.string(),
     })
     .secondaryIndexes((index) => [
       index("boxId").sortKeys(["pageNumber"]).name("byBox"),
@@ -181,6 +173,7 @@ const schema = a.schema({
     ]),
 
   // UserReview entity - tracks what each user has reviewed (audit trail)
+  // Note: tenantViewerGroup, tenantReviewerGroup, tenantAdminGroup fields are created implicitly by groupsDefinedIn
   Box2CloudUserReview: a
     .model({
       userId: a.string().required(),
@@ -190,9 +183,6 @@ const schema = a.schema({
       setId: a.string().required(),
       pageNumber: a.integer().required(),
       decision: a.enum(["shred", "unsure", "retain"]),
-      tenantViewerGroup: a.string(),
-      tenantReviewerGroup: a.string(),
-      tenantAdminGroup: a.string(),
     })
     .secondaryIndexes((index) => [
       index("userId").name("byUser"),
