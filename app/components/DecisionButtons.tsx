@@ -14,35 +14,35 @@ export function DecisionButtons({
   loading = false,
 }: DecisionButtonsProps) {
   return (
-    <div className="flex gap-4 p-6 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 relative max-sm:flex-col max-sm:p-4">
+    <div className="flex flex-col gap-3 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 relative">
       <button
-        className="flex-1 flex flex-col items-center gap-1 py-4 px-8 text-white bg-red-600 hover:bg-red-700 disabled:hover:bg-red-600 rounded-lg min-h-[70px] max-sm:py-3 max-sm:min-h-[60px]"
+        className="flex items-center justify-center gap-2 py-4 px-6 text-white bg-red-600 hover:bg-red-700 disabled:hover:bg-red-600 rounded-lg"
         onClick={() => onDecision("shred")}
         disabled={disabled}
         title="Press 1 or S"
       >
         <span className="font-semibold text-lg">SHRED</span>
-        <span className="text-xs opacity-80">(1)</span>
+        <span className="text-sm opacity-80">(1)</span>
       </button>
 
       <button
-        className="flex-1 flex flex-col items-center gap-1 py-4 px-8 text-white bg-amber-500 hover:bg-amber-600 disabled:hover:bg-amber-500 rounded-lg min-h-[70px] max-sm:py-3 max-sm:min-h-[60px]"
+        className="flex items-center justify-center gap-2 py-4 px-6 text-white bg-amber-500 hover:bg-amber-600 disabled:hover:bg-amber-500 rounded-lg"
         onClick={() => onDecision("unsure")}
         disabled={disabled}
         title="Press 2 or U"
       >
         <span className="font-semibold text-lg">UNSURE</span>
-        <span className="text-xs opacity-80">(2)</span>
+        <span className="text-sm opacity-80">(2)</span>
       </button>
 
       <button
-        className="flex-1 flex flex-col items-center gap-1 py-4 px-8 text-white bg-green-600 hover:bg-green-700 disabled:hover:bg-green-600 rounded-lg min-h-[70px] max-sm:py-3 max-sm:min-h-[60px]"
+        className="flex items-center justify-center gap-2 py-4 px-6 text-white bg-green-600 hover:bg-green-700 disabled:hover:bg-green-600 rounded-lg"
         onClick={() => onDecision("retain")}
         disabled={disabled}
         title="Press 3 or R"
       >
         <span className="font-semibold text-lg">RETAIN</span>
-        <span className="text-xs opacity-80">(3)</span>
+        <span className="text-sm opacity-80">(3)</span>
       </button>
 
       {loading && (

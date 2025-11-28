@@ -1,5 +1,5 @@
 /**
- * DocSense Cloud - TypeScript Type Definitions
+ * Box to Cloud - TypeScript Type Definitions
  */
 
 // Review decision types
@@ -15,8 +15,8 @@ export type BoxRecommendation = "SHRED" | "RETAIN" | "REVIEW" | null;
 export interface PageContext {
   boxTotalPages: number;
   boxPagesReviewed: number;
-  docPageCount: number;
-  docCurrentPage: number;
+  setPageCount: number;
+  setCurrentPage: number;
 }
 
 // Page entity for review
@@ -24,7 +24,7 @@ export interface PageData {
   id: string;
   pageId: string;
   boxId: string;
-  docId: string;
+  setId: string;
   pageNumber: number;
   filename: string;
   imageUrl: string;
@@ -43,7 +43,7 @@ export interface BoxData {
   id: string;
   boxNumber: string;
   tenantId: string;
-  totalDocuments: number;
+  totalSets: number;
   totalPages: number;
   pagesReviewed: number;
   pagesShred: number;
@@ -53,10 +53,10 @@ export interface BoxData {
   recommendation?: BoxRecommendation;
 }
 
-// Document entity
-export interface DocumentData {
+// Set entity - represents a batch of scanned pages (one PDF file)
+export interface SetData {
   id: string;
-  docId: string;
+  setId: string;
   boxId: string;
   filename: string;
   pageCount: number;

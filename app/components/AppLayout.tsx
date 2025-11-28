@@ -26,7 +26,7 @@ export function AppLayout({ children, activePage }: AppLayoutProps) {
                 Box to Cloud
               </h1>
               <span className="text-sm text-gray-500 dark:text-gray-400">
-                Document Retention Review
+                Page Retention Review
               </span>
             </div>
             <div className="flex items-center gap-8 max-md:flex-col max-md:gap-4 max-md:w-full">

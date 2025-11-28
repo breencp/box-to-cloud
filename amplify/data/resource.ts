@@ -3,7 +3,7 @@ import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 /**
  * Box to Cloud - Document Retention Review Application
  *
- * Data schema for managing document page reviews.
+ * Data schema for managing page reviews.
  * All model names prefixed with "Box2Cloud" for easy identification in AWS Console.
  * See CLOUD_MIGRATION_SPEC.md for detailed entity definitions.
  */
@@ -14,7 +14,7 @@ const schema = a.schema({
     .model({
       boxNumber: a.string().required(),
       tenantId: a.string().required(),
-      totalDocuments: a.integer().default(0),
+      totalSets: a.integer().default(0),
       totalPages: a.integer().default(0),
       pagesReviewed: a.integer().default(0),
       pagesShred: a.integer().default(0),
@@ -27,10 +27,10 @@ const schema = a.schema({
     ])
     .authorization((allow) => [allow.authenticated()]),
 
-  // Document entity - represents a single PDF file within a box
-  Box2CloudDocument: a
+  // Set entity - represents a batch of scanned pages (one PDF file)
+  Box2CloudSet: a
     .model({
-      docId: a.string().required(),
+      setId: a.string().required(),
       boxId: a.id().required(),
       tenantId: a.string().required(),
       filename: a.string().required(),
@@ -38,16 +38,16 @@ const schema = a.schema({
       pagesReviewed: a.integer().default(0),
     })
     .secondaryIndexes((index) => [
-      index("boxId").sortKeys(["docId"]).name("byBox"),
+      index("boxId").sortKeys(["setId"]).name("byBox"),
       index("tenantId").name("byTenant"),
     ])
     .authorization((allow) => [allow.authenticated()]),
 
-  // Page entity - represents a single page within a document (primary review entity)
+  // Page entity - represents a single page within a set (primary review entity)
   Box2CloudPage: a
     .model({
       pageId: a.string().required(),
-      docId: a.string().required(),
+      setId: a.string().required(),
       boxId: a.id().required(),
       tenantId: a.string().required(),
       pageNumber: a.integer().required(),
@@ -74,7 +74,7 @@ const schema = a.schema({
       tenantId: a.string().required(),
       pageId: a.string().required(),
       boxNumber: a.string().required(),
-      docId: a.string().required(),
+      setId: a.string().required(),
       pageNumber: a.integer().required(),
       decision: a.enum(["shred", "unsure", "retain"]),
     })

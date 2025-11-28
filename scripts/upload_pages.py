@@ -68,7 +68,7 @@ def parse_pdf_filename(filename: str) -> dict | None:
     """
     Parse PDF filename in format: box_xxx_yyyymmdd_hhmmss.pdf
 
-    Returns dict with boxNumber, date, time, docId or None if invalid.
+    Returns dict with boxNumber, date, time, setId or None if invalid.
     """
     pattern = r"^box_(\d{3})_(\d{8})_(\d{6})\.pdf$"
     match = re.match(pattern, filename, re.IGNORECASE)
@@ -82,7 +82,7 @@ def parse_pdf_filename(filename: str) -> dict | None:
         "boxNumber": box_num,
         "date": date_str,
         "time": time_str,
-        "docId": f"box_{box_num}_{date_str}_{time_str}",
+        "setId": f"box_{box_num}_{date_str}_{time_str}",
         "filename": filename,
     }
 
@@ -102,25 +102,25 @@ def get_existing_s3_keys(s3_client, bucket: str, prefix: str = "pages/") -> set:
     return existing_keys
 
 
-def get_existing_docs(dynamodb, table_name: str) -> set:
-    """Get all existing document IDs from DynamoDB."""
-    existing_docs = set()
+def get_existing_sets(dynamodb, table_name: str) -> set:
+    """Get all existing set IDs from DynamoDB."""
+    existing_sets = set()
     table = dynamodb.Table(table_name)
 
-    print(f"Fetching existing documents from {table_name}...")
+    print(f"Fetching existing sets from {table_name}...")
 
-    response = table.scan(ProjectionExpression="docId")
-    existing_docs.update(item["docId"] for item in response.get("Items", []))
+    response = table.scan(ProjectionExpression="setId")
+    existing_sets.update(item["setId"] for item in response.get("Items", []))
 
     while "LastEvaluatedKey" in response:
         response = table.scan(
-            ProjectionExpression="docId",
+            ProjectionExpression="setId",
             ExclusiveStartKey=response["LastEvaluatedKey"]
         )
-        existing_docs.update(item["docId"] for item in response.get("Items", []))
+        existing_sets.update(item["setId"] for item in response.get("Items", []))
 
-    print(f"Found {len(existing_docs)} existing documents in DynamoDB")
-    return existing_docs
+    print(f"Found {len(existing_sets)} existing sets in DynamoDB")
+    return existing_sets
 
 
 def find_dynamodb_tables(dynamodb_client, env_id: str | None = None) -> dict | list:
@@ -153,8 +153,8 @@ def find_dynamodb_tables(dynamodb_client, env_id: str | None = None) -> dict | l
 
                 if "Box2CloudBox" in table_name:
                     environments[env]["tables"]["box"] = table_name
-                elif "Box2CloudDocument" in table_name:
-                    environments[env]["tables"]["document"] = table_name
+                elif "Box2CloudSet" in table_name:
+                    environments[env]["tables"]["set"] = table_name
                 elif "Box2CloudPage" in table_name:
                     environments[env]["tables"]["page"] = table_name
 
@@ -218,9 +218,8 @@ def upload_page_image(s3_client, bucket: str, image, s3_key: str) -> bool:
     return True
 
 
-def create_or_update_box(dynamodb, table_name: str, box_number: str,
-                          total_docs: int, total_pages: int) -> str:
-    """Create or update a box record, returns the box ID."""
+def get_or_create_box(dynamodb, table_name: str, box_number: str) -> str:
+    """Get existing box or create a new one, returns the box ID."""
     table = dynamodb.Table(table_name)
 
     # Check if box exists
@@ -233,17 +232,7 @@ def create_or_update_box(dynamodb, table_name: str, box_number: str,
     )
 
     if response.get("Items"):
-        # Update existing box
-        box = response["Items"][0]
-        table.update_item(
-            Key={"id": box["id"]},
-            UpdateExpression="SET totalDocuments = totalDocuments + :docs, totalPages = totalPages + :pages",
-            ExpressionAttributeValues={
-                ":docs": total_docs,
-                ":pages": total_pages,
-            }
-        )
-        return box["id"]
+        return response["Items"][0]["id"]
     else:
         # Create new box
         import uuid
@@ -252,8 +241,8 @@ def create_or_update_box(dynamodb, table_name: str, box_number: str,
             "id": box_id,
             "boxNumber": box_number,
             "tenantId": TENANT_ID,
-            "totalDocuments": total_docs,
-            "totalPages": total_pages,
+            "totalDocuments": 0,
+            "totalPages": 0,
             "pagesReviewed": 0,
             "pagesShred": 0,
             "pagesUnsure": 0,
@@ -265,15 +254,66 @@ def create_or_update_box(dynamodb, table_name: str, box_number: str,
         return box_id
 
 
-def create_document(dynamodb, table_name: str, doc_id: str, box_id: str,
-                    filename: str, page_count: int) -> None:
-    """Create a document record."""
+def recalculate_box_totals(dynamodb, tables: dict, box_id: str) -> None:
+    """Recalculate box totals from actual set and page records."""
+    # Count sets for this box
+    set_table = dynamodb.Table(tables["set"])
+    set_response = set_table.scan(
+        FilterExpression="boxId = :bid",
+        ExpressionAttributeValues={":bid": box_id}
+    )
+    total_sets = len(set_response.get("Items", []))
+
+    # Count pages and review statuses for this box
+    page_table = dynamodb.Table(tables["page"])
+    page_response = page_table.scan(
+        FilterExpression="boxId = :bid",
+        ExpressionAttributeValues={":bid": box_id}
+    )
+    pages = page_response.get("Items", [])
+    total_pages = len(pages)
+    pages_reviewed = sum(1 for p in pages if p.get("reviewStatus") and p["reviewStatus"] != "pending")
+    pages_shred = sum(1 for p in pages if p.get("reviewStatus") == "shred")
+    pages_unsure = sum(1 for p in pages if p.get("reviewStatus") == "unsure")
+    pages_retain = sum(1 for p in pages if p.get("reviewStatus") == "retain")
+
+    # Determine status
+    if total_pages == 0:
+        status = "pending"
+    elif pages_reviewed == total_pages:
+        status = "complete"
+    elif pages_reviewed > 0:
+        status = "in_progress"
+    else:
+        status = "pending"
+
+    # Update box with calculated totals
+    box_table = dynamodb.Table(tables["box"])
+    box_table.update_item(
+        Key={"id": box_id},
+        UpdateExpression="SET totalSets = :sets, totalPages = :pages, pagesReviewed = :reviewed, pagesShred = :shred, pagesUnsure = :unsure, pagesRetain = :retain, #st = :status",
+        ExpressionAttributeNames={"#st": "status"},
+        ExpressionAttributeValues={
+            ":sets": total_sets,
+            ":pages": total_pages,
+            ":reviewed": pages_reviewed,
+            ":shred": pages_shred,
+            ":unsure": pages_unsure,
+            ":retain": pages_retain,
+            ":status": status,
+        }
+    )
+
+
+def create_set(dynamodb, table_name: str, set_id: str, box_id: str,
+               filename: str, page_count: int) -> None:
+    """Create a set record."""
     table = dynamodb.Table(table_name)
     import uuid
 
     table.put_item(Item={
         "id": str(uuid.uuid4()),
-        "docId": doc_id,
+        "setId": set_id,
         "boxId": box_id,
         "tenantId": TENANT_ID,
         "filename": filename,
@@ -284,7 +324,7 @@ def create_document(dynamodb, table_name: str, doc_id: str, box_id: str,
     })
 
 
-def create_page(dynamodb, table_name: str, page_id: str, doc_id: str,
+def create_page(dynamodb, table_name: str, page_id: str, set_id: str,
                 box_id: str, page_number: int, filename: str, s3_key: str) -> None:
     """Create a page record."""
     table = dynamodb.Table(table_name)
@@ -293,7 +333,7 @@ def create_page(dynamodb, table_name: str, page_id: str, doc_id: str,
     table.put_item(Item={
         "id": str(uuid.uuid4()),
         "pageId": page_id,
-        "docId": doc_id,
+        "setId": set_id,
         "boxId": box_id,
         "tenantId": TENANT_ID,
         "pageNumber": page_number,
@@ -305,17 +345,46 @@ def create_page(dynamodb, table_name: str, page_id: str, doc_id: str,
     })
 
 
+def delete_existing_records(dynamodb, tables: dict, set_id: str) -> None:
+    """Delete existing set and page records for a set_id."""
+    # Delete set records
+    set_table = dynamodb.Table(tables["set"])
+    response = set_table.scan(
+        FilterExpression="setId = :sid",
+        ExpressionAttributeValues={":sid": set_id}
+    )
+    for item in response.get("Items", []):
+        set_table.delete_item(Key={"id": item["id"]})
+        print(f"    Deleted existing set record: {item['id']}")
+
+    # Delete page records
+    page_table = dynamodb.Table(tables["page"])
+    response = page_table.scan(
+        FilterExpression="setId = :sid",
+        ExpressionAttributeValues={":sid": set_id}
+    )
+    deleted_pages = len(response.get("Items", []))
+    for item in response.get("Items", []):
+        page_table.delete_item(Key={"id": item["id"]})
+    if deleted_pages > 0:
+        print(f"    Deleted {deleted_pages} existing page records")
+
+
 def process_pdf(pdf_path: Path, pdf_info: dict, s3_client, dynamodb,
                 tables: dict, bucket: str, existing_s3_keys: set,
-                existing_docs: set) -> dict:
+                existing_sets: set, force: bool = False) -> dict:
     """Process a single PDF file."""
-    doc_id = pdf_info["docId"]
+    set_id = pdf_info["setId"]
     box_number = pdf_info["boxNumber"]
 
-    # Skip if already processed
-    if doc_id in existing_docs:
-        print(f"  Skipping {pdf_info['filename']} - already processed")
-        return {"skipped": True}
+    # Skip if already processed (unless forcing)
+    if set_id in existing_sets:
+        if not force:
+            print(f"  Skipping {pdf_info['filename']} - already processed")
+            return {"skipped": True}
+        else:
+            print(f"  Force mode: deleting existing records for {pdf_info['filename']}")
+            delete_existing_records(dynamodb, tables, set_id)
 
     print(f"  Processing {pdf_info['filename']}...")
 
@@ -329,22 +398,19 @@ def process_pdf(pdf_path: Path, pdf_info: dict, s3_client, dynamodb,
     page_count = len(images)
     print(f"    Found {page_count} pages")
 
-    # Create/update box record
-    box_id = create_or_update_box(
-        dynamodb, tables["box"], box_number,
-        total_docs=1, total_pages=page_count
-    )
+    # Get or create box record
+    box_id = get_or_create_box(dynamodb, tables["box"], box_number)
 
-    # Create document record
-    create_document(
-        dynamodb, tables["document"], doc_id, box_id,
+    # Create set record
+    create_set(
+        dynamodb, tables["set"], set_id, box_id,
         pdf_info["filename"], page_count
     )
 
     # Upload each page
     for page_num, image in enumerate(images, start=1):
-        s3_key = f"pages/{box_number}/{doc_id}/page_{page_num:04d}.png"
-        page_id = f"{doc_id}_page_{page_num:04d}"
+        s3_key = f"pages/{box_number}/{set_id}/page_{page_num:04d}.png"
+        page_id = f"{set_id}_page_{page_num:04d}"
 
         if s3_key not in existing_s3_keys:
             upload_page_image(s3_client, bucket, image, s3_key)
@@ -354,19 +420,23 @@ def process_pdf(pdf_path: Path, pdf_info: dict, s3_client, dynamodb,
 
         # Create page record
         create_page(
-            dynamodb, tables["page"], page_id, doc_id,
+            dynamodb, tables["page"], page_id, set_id,
             box_id, page_num, f"page_{page_num:04d}.png", s3_key
         )
+
+    # Recalculate box totals from actual data
+    recalculate_box_totals(dynamodb, tables, box_id)
 
     return {"pages": page_count, "box_id": box_id}
 
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python upload_pages.py /path/to/scanned/pdfs [--env ENV_ID]")
-        print("       python upload_pages.py /path/to/file.pdf [--env ENV_ID]")
+        print("Usage: python upload_pages.py /path/to/scanned/pdfs [--env ENV_ID] [--force]")
+        print("       python upload_pages.py /path/to/file.pdf [--env ENV_ID] [--force]")
         print("\nOptions:")
         print("  --env ENV_ID  Specify the environment ID (the code between hyphens in table names)")
+        print("  --force       Re-upload files even if they exist in DynamoDB")
         print("\nOptional environment variables:")
         print("  AWS_REGION - AWS region (default: us-east-1)")
         print("  S3_BUCKET - S3 bucket name (auto-detected from amplify_outputs.json)")
@@ -377,6 +447,7 @@ def main():
     args = sys.argv[1:]
     env_id = None
     input_path_str = None
+    force_upload = False
 
     i = 0
     while i < len(args):
@@ -387,6 +458,9 @@ def main():
             else:
                 print("Error: --env requires an argument")
                 sys.exit(1)
+        elif args[i] == "--force":
+            force_upload = True
+            i += 1
         elif input_path_str is None:
             input_path_str = args[i]
             i += 1
@@ -448,7 +522,7 @@ def main():
         sys.exit(1)
 
     tables = tables_result
-    if not tables or not all(k in tables for k in ["box", "document", "page"]):
+    if not tables or not all(k in tables for k in ["box", "set", "page"]):
         print(f"Error: Could not find all required DynamoDB tables.")
         print(f"Found: {tables}")
         print("Make sure Amplify backend is deployed.")
@@ -479,7 +553,9 @@ def main():
 
     # Get existing data
     existing_s3_keys = get_existing_s3_keys(s3_client, S3_BUCKET)
-    existing_docs = get_existing_docs(dynamodb, tables["document"])
+    existing_sets = get_existing_sets(dynamodb, tables["set"])
+    if force_upload:
+        print("Force mode: will delete and re-upload existing files")
 
     # Find PDFs to process
     if single_file_mode:
@@ -501,7 +577,8 @@ def main():
 
         result = process_pdf(
             pdf_path, pdf_info, s3_client, dynamodb,
-            tables, S3_BUCKET, existing_s3_keys, existing_docs
+            tables, S3_BUCKET, existing_s3_keys, existing_sets,
+            force=force_upload
         )
 
         if result.get("skipped"):
@@ -515,7 +592,7 @@ def main():
     # Print summary
     print(f"\n{'='*50}")
     print("Upload Complete!")
-    print(f"  Processed: {stats['processed']} documents ({stats['pages']} pages)")
+    print(f"  Processed: {stats['processed']} sets ({stats['pages']} pages)")
     print(f"  Skipped:   {stats['skipped']} (already uploaded)")
     print(f"  Errors:    {stats['errors']}")
 

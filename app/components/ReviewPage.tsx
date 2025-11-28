@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { generateClient } from "aws-amplify/data";
+import { fetchAuthSession } from "aws-amplify/auth";
 import type { Schema } from "@/amplify/data/resource";
 import { DecisionButtons } from "./DecisionButtons";
 import { PageContext } from "./PageContext";
@@ -9,12 +10,13 @@ import { PageImage } from "./PageImage";
 import type { ReviewDecision } from "../types";
 
 const client = generateClient<Schema>();
+const TENANT_ID = "default";
 
 interface CurrentPage {
   id: string;
   pageId: string;
   boxId: string;
-  docId: string;
+  setId: string;
   pageNumber: number;
   filename: string;
   s3Key: string;
@@ -35,15 +37,47 @@ export function ReviewPage() {
     setError(null);
 
     try {
-      const { data: pages } = await client.models.Box2CloudPage.list({
-        filter: {
-          reviewStatus: { eq: "pending" },
-        },
-        limit: 1,
+      // Get current user ID for lock checking
+      const session = await fetchAuthSession();
+      const userId = session.tokens?.idToken?.payload?.sub as string || "unknown";
+      const now = new Date();
+      const lockExpiryTime = new Date(now.getTime() - 5 * 60 * 1000); // 5 minutes ago
+
+      // Fetch pages and filter client-side for pending status
+      // Note: GraphQL enum filter doesn't work with records created via boto3
+      const { data: allPages } = await client.models.Box2CloudPage.list({
+        limit: 1000,
       });
 
-      if (pages && pages.length > 0) {
-        const page = pages[0];
+      // Filter for pending pages and sort by box number, then page number
+      const pendingPages = (allPages?.filter(p => p.reviewStatus === "pending") || [])
+        .sort((a, b) => {
+          // Sort by setId first (contains box number), then by page number
+          const setCompare = a.setId.localeCompare(b.setId);
+          if (setCompare !== 0) return setCompare;
+          return a.pageNumber - b.pageNumber;
+        });
+
+      // Find first page that's not locked by someone else
+      const availablePage = pendingPages.find(p => {
+        // Not locked at all
+        if (!p.lockedBy || !p.lockedAt) return true;
+        // Locked by current user
+        if (p.lockedBy === userId) return true;
+        // Lock has expired (older than 5 minutes)
+        const lockTime = new Date(p.lockedAt);
+        return lockTime < lockExpiryTime;
+      });
+
+      if (availablePage) {
+        const page = availablePage;
+
+        // Lock the page for this user
+        await client.models.Box2CloudPage.update({
+          id: page.id,
+          lockedBy: userId,
+          lockedAt: now.toISOString(),
+        });
 
         let boxInfo = {
           boxNumber: "",
@@ -66,7 +100,7 @@ export function ReviewPage() {
           id: page.id,
           pageId: page.pageId,
           boxId: page.boxId || "",
-          docId: page.docId,
+          setId: page.setId,
           pageNumber: page.pageNumber,
           filename: page.filename,
           s3Key: page.s3Key,
@@ -98,12 +132,32 @@ export function ReviewPage() {
     setError(null);
 
     try {
+      // Get current user ID
+      const session = await fetchAuthSession();
+      const userId = session.tokens?.idToken?.payload?.sub as string || "unknown";
+
+      // Update page status and clear lock
       await client.models.Box2CloudPage.update({
         id: currentPage.id,
         reviewStatus: decision,
+        reviewedBy: userId,
         reviewedAt: new Date().toISOString(),
+        lockedBy: null,
+        lockedAt: null,
       });
 
+      // Create user review record (audit trail)
+      await client.models.Box2CloudUserReview.create({
+        userId,
+        tenantId: TENANT_ID,
+        pageId: currentPage.pageId,
+        boxNumber: currentPage.boxNumber || "",
+        setId: currentPage.setId,
+        pageNumber: currentPage.pageNumber,
+        decision,
+      });
+
+      // Update box statistics
       if (currentPage.boxId) {
         const { data: box } = await client.models.Box2CloudBox.get({
           id: currentPage.boxId,
@@ -223,24 +277,30 @@ export function ReviewPage() {
   }
 
   return (
-    <div className="flex flex-col h-full flex-1">
-      <PageContext
-        boxNumber={currentPage.boxNumber || ""}
-        filename={currentPage.filename}
-        pageNumber={currentPage.pageNumber}
-        totalPages={currentPage.boxTotalPages || 0}
-        pagesReviewed={currentPage.boxPagesReviewed || 0}
-      />
-
+    <div className="flex h-full flex-1">
+      {/* Left side - Image (maximum real estate) */}
       <div className="flex-1 flex items-center justify-center overflow-auto bg-gray-50 dark:bg-gray-900 p-4">
         <PageImage s3Key={currentPage.s3Key} filename={currentPage.filename} />
       </div>
 
-      <DecisionButtons
-        onDecision={handleDecision}
-        disabled={submitting}
-        loading={submitting}
-      />
+      {/* Right side - Context and Controls */}
+      <div className="w-80 flex flex-col border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <PageContext
+          boxNumber={currentPage.boxNumber || ""}
+          filename={currentPage.filename}
+          pageNumber={currentPage.pageNumber}
+          totalPages={currentPage.boxTotalPages || 0}
+          pagesReviewed={currentPage.boxPagesReviewed || 0}
+        />
+
+        <div className="flex-1" />
+
+        <DecisionButtons
+          onDecision={handleDecision}
+          disabled={submitting}
+          loading={submitting}
+        />
+      </div>
     </div>
   );
 }

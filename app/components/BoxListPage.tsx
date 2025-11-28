@@ -10,7 +10,7 @@ const client = generateClient<Schema>();
 interface Box {
   id: string;
   boxNumber: string;
-  totalDocuments: number;
+  totalSets: number;
   totalPages: number;
   pagesReviewed: number;
   pagesShred: number;
@@ -34,7 +34,7 @@ export function BoxListPage() {
             data.map((box) => ({
               id: box.id,
               boxNumber: box.boxNumber || "",
-              totalDocuments: box.totalDocuments || 0,
+              totalSets: box.totalSets || 0,
               totalPages: box.totalPages || 0,
               pagesReviewed: box.pagesReviewed || 0,
               pagesShred: box.pagesShred || 0,
@@ -155,7 +155,7 @@ export function BoxListPage() {
         {/* Table Header */}
         <div className="hidden md:grid grid-cols-[100px_100px_80px_1fr_120px_100px_120px] gap-4 px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
           <span>Box</span>
-          <span>Documents</span>
+          <span>Sets</span>
           <span>Pages</span>
           <span>Progress</span>
           <span>Breakdown</span>
@@ -191,7 +191,7 @@ export function BoxListPage() {
                   Box {box.boxNumber}
                 </span>
                 <span className="text-gray-600 dark:text-gray-300">
-                  {box.totalDocuments}
+                  {box.totalSets}
                 </span>
                 <span className="text-gray-600 dark:text-gray-300">
                   {box.totalPages}

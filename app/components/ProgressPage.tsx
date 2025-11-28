@@ -87,7 +87,7 @@ export function ProgressPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-8 max-md:p-4">
+    <div className="w-full p-8 max-md:p-4">
       <div className="mb-8">
         <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
           Review Progress
@@ -95,7 +95,7 @@ export function ProgressPage() {
       </div>
 
       {/* Overview Section */}
-      <div className="grid grid-cols-[2fr_1fr] gap-8 mb-8 max-md:grid-cols-1">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 mb-8">
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
           <div className="flex justify-between mb-3">
             <span className="font-semibold text-gray-900 dark:text-gray-100">
@@ -112,8 +112,8 @@ export function ProgressPage() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-4 max-md:flex-row max-md:justify-between">
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 flex flex-col items-center max-md:flex-1">
+        <div className="flex flex-row lg:flex-col gap-4 justify-between lg:justify-start">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 flex flex-col items-center flex-1 lg:flex-none lg:min-w-[120px]">
             <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {percentComplete}%
             </span>
@@ -121,7 +121,7 @@ export function ProgressPage() {
               Complete
             </span>
           </div>
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 flex flex-col items-center max-md:flex-1">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 flex flex-col items-center flex-1 lg:flex-none lg:min-w-[120px]">
             <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {boxes.length}
             </span>
@@ -129,7 +129,7 @@ export function ProgressPage() {
               Total Boxes
             </span>
           </div>
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 flex flex-col items-center max-md:flex-1">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 flex flex-col items-center flex-1 lg:flex-none lg:min-w-[120px]">
             <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {boxesComplete}
             </span>
@@ -145,7 +145,7 @@ export function ProgressPage() {
         <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
           Decision Breakdown
         </h3>
-        <div className="grid grid-cols-3 gap-4 max-md:grid-cols-1">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 flex flex-col gap-2">
             <span className="text-2xl font-bold text-red-600">
               {pagesShred.toLocaleString()}
@@ -213,7 +213,7 @@ export function ProgressPage() {
             Pending
           </span>
         </div>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
           {boxes
             .sort((a, b) => a.boxNumber.localeCompare(b.boxNumber))
             .map((box) => (
