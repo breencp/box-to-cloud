@@ -132,15 +132,52 @@ export function AdminPage() {
     }
   }
 
+  // State for showing group creation instructions
+  const [newTenantGroups, setNewTenantGroups] = useState<{
+    tenantId: string;
+    tenantName: string;
+    groups: string[];
+  } | null>(null);
+
+  // State for showing user creation instructions after invite
+  const [newInviteInfo, setNewInviteInfo] = useState<{
+    email: string;
+    tenantName: string;
+    role: string;
+    groupName: string;
+  } | null>(null);
+
+  function getTenantGroupNames(tenantId: string): string[] {
+    return [
+      `tenant_${tenantId}_viewer`,
+      `tenant_${tenantId}_reviewer`,
+      `tenant_${tenantId}_admin`,
+    ];
+  }
+
+  function getTenantGroupForRole(tenantId: string, role: string): string {
+    return `tenant_${tenantId}_${role}`;
+  }
+
   async function handleCreateTenant() {
     if (!tenantForm.name.trim()) return;
 
     try {
-      await client.models.Box2CloudTenant.create({
+      const result = await client.models.Box2CloudTenant.create({
         name: tenantForm.name.trim(),
         address: tenantForm.address.trim() || undefined,
         isActive: true,
       });
+
+      // Show the Cognito groups that need to be created
+      if (result.data) {
+        setNewTenantGroups({
+          tenantId: result.data.id,
+          tenantName: result.data.name,
+          groups: getTenantGroupNames(result.data.id),
+        });
+      }
+
       setShowTenantModal(false);
       setTenantForm({ name: "", address: "" });
       loadData();
@@ -186,6 +223,19 @@ export function AdminPage() {
         expiresAt: expiresAt.toISOString(),
         status: "pending",
       });
+
+      // Get tenant name for display
+      const tenant = tenants.find((t) => t.id === inviteForm.tenantId);
+      const groupName = getTenantGroupForRole(inviteForm.tenantId, inviteForm.role);
+
+      // Show user creation instructions
+      setNewInviteInfo({
+        email: inviteForm.email.trim().toLowerCase(),
+        tenantName: tenant?.name || "Unknown",
+        role: inviteForm.role,
+        groupName,
+      });
+
       setShowInviteModal(false);
       setInviteForm({ email: "", tenantId: "", role: "viewer", fullName: "", title: "" });
       loadData();
@@ -648,6 +698,114 @@ export function AdminPage() {
                 disabled={!inviteForm.email || !inviteForm.tenantId}
               >
                 Send Invite
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Group Creation Instructions Modal */}
+      {newTenantGroups && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              Tenant Created Successfully
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Create the following Cognito groups for <strong>{newTenantGroups.tenantName}</strong>:
+            </p>
+            <div className="bg-gray-100 dark:bg-gray-900 rounded-lg p-4 mb-4 font-mono text-sm overflow-x-auto">
+              {newTenantGroups.groups.map((group) => (
+                <div key={group} className="text-gray-800 dark:text-gray-200">
+                  {group}
+                </div>
+              ))}
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Run these AWS CLI commands to create the groups:
+            </p>
+            <div className="bg-gray-900 rounded-lg p-4 mb-4 font-mono text-xs text-green-400 overflow-x-auto">
+              <pre>{`# Replace USER_POOL_ID with your Cognito User Pool ID
+${newTenantGroups.groups.map((g) => `aws cognito-idp create-group --user-pool-id USER_POOL_ID --group-name "${g}"`).join("\n")}`}</pre>
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setNewTenantGroups(null)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Creation Instructions Modal */}
+      {newInviteInfo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              Invite Created Successfully
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Now create the Cognito user and add them to the group:
+            </p>
+
+            <div className="space-y-3 mb-4">
+              <div>
+                <span className="text-sm text-gray-500 dark:text-gray-400">Email:</span>
+                <span className="ml-2 font-mono text-gray-900 dark:text-gray-100">
+                  {newInviteInfo.email}
+                </span>
+              </div>
+              <div>
+                <span className="text-sm text-gray-500 dark:text-gray-400">Tenant:</span>
+                <span className="ml-2 text-gray-900 dark:text-gray-100">
+                  {newInviteInfo.tenantName}
+                </span>
+              </div>
+              <div>
+                <span className="text-sm text-gray-500 dark:text-gray-400">Role:</span>
+                <span className="ml-2 text-gray-900 dark:text-gray-100 capitalize">
+                  {newInviteInfo.role}
+                </span>
+              </div>
+              <div>
+                <span className="text-sm text-gray-500 dark:text-gray-400">Group:</span>
+                <span className="ml-2 font-mono text-gray-900 dark:text-gray-100">
+                  {newInviteInfo.groupName}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Run these AWS CLI commands:
+            </p>
+            <div className="bg-gray-900 rounded-lg p-4 mb-4 font-mono text-xs text-green-400 overflow-x-auto">
+              <pre>{`# Replace USER_POOL_ID with your Cognito User Pool ID
+
+# 1. Create the user (they will receive an email with temporary password)
+aws cognito-idp admin-create-user \\
+  --user-pool-id USER_POOL_ID \\
+  --username "${newInviteInfo.email}" \\
+  --user-attributes Name=email,Value="${newInviteInfo.email}" Name=email_verified,Value=true \\
+  --desired-delivery-mediums EMAIL
+
+# 2. Add user to the tenant group
+aws cognito-idp admin-add-user-to-group \\
+  --user-pool-id USER_POOL_ID \\
+  --username "${newInviteInfo.email}" \\
+  --group-name "${newInviteInfo.groupName}"`}</pre>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+              Note: You can also create users via the AWS Console under Cognito &gt; User pools &gt; Users.
+            </p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setNewInviteInfo(null)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Done
               </button>
             </div>
           </div>

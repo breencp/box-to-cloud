@@ -54,7 +54,6 @@ const schema = a.schema({
     .authorization((allow) => [
       allow.groups(["admin"]),
       allow.authenticated().to(["read"]),
-      allow.owner().to(["read", "update"]),
     ]),
 
   // UserTenant entity - links users to tenants with roles
@@ -97,6 +96,7 @@ const schema = a.schema({
     ]),
 
   // Box entity - represents a physical box of scanned documents
+  // Authorization: tenant viewers can read, tenant reviewers can read/update
   Box2CloudBox: a
     .model({
       boxNumber: a.string().required(),
@@ -108,11 +108,20 @@ const schema = a.schema({
       pagesUnsure: a.integer().default(0),
       pagesRetain: a.integer().default(0),
       status: a.enum(["pending", "in_progress", "complete"]),
+      // Groups that can access this record (set when creating: ["tenant_{id}_viewer", "tenant_{id}_reviewer", "tenant_{id}_admin"])
+      viewerGroup: a.string(),
+      reviewerGroup: a.string(),
+      adminGroup: a.string(),
     })
     .secondaryIndexes((index) => [
       index("tenantId").sortKeys(["boxNumber"]).name("byTenant"),
     ])
-    .authorization((allow) => [allow.authenticated()]),
+    .authorization((allow) => [
+      allow.groups(["admin"]), // Super admins
+      allow.groupsDefinedIn("viewerGroup").to(["read"]),
+      allow.groupsDefinedIn("reviewerGroup").to(["read", "update"]),
+      allow.groupsDefinedIn("adminGroup"),
+    ]),
 
   // Set entity - represents a batch of scanned pages (one PDF file)
   Box2CloudSet: a
@@ -123,12 +132,20 @@ const schema = a.schema({
       filename: a.string().required(),
       pageCount: a.integer().default(0),
       pagesReviewed: a.integer().default(0),
+      viewerGroup: a.string(),
+      reviewerGroup: a.string(),
+      adminGroup: a.string(),
     })
     .secondaryIndexes((index) => [
       index("boxId").sortKeys(["setId"]).name("byBox"),
       index("tenantId").name("byTenant"),
     ])
-    .authorization((allow) => [allow.authenticated()]),
+    .authorization((allow) => [
+      allow.groups(["admin"]),
+      allow.groupsDefinedIn("viewerGroup").to(["read"]),
+      allow.groupsDefinedIn("reviewerGroup").to(["read", "update"]),
+      allow.groupsDefinedIn("adminGroup"),
+    ]),
 
   // Page entity - represents a single page within a set (primary review entity)
   Box2CloudPage: a
@@ -145,6 +162,9 @@ const schema = a.schema({
       reviewedAt: a.datetime(),
       lockedBy: a.string(),
       lockedAt: a.datetime(),
+      viewerGroup: a.string(),
+      reviewerGroup: a.string(),
+      adminGroup: a.string(),
     })
     .secondaryIndexes((index) => [
       index("boxId").sortKeys(["pageNumber"]).name("byBox"),
@@ -152,7 +172,12 @@ const schema = a.schema({
         .sortKeys(["reviewStatus"])
         .name("byTenantAndStatus"),
     ])
-    .authorization((allow) => [allow.authenticated()]),
+    .authorization((allow) => [
+      allow.groups(["admin"]),
+      allow.groupsDefinedIn("viewerGroup").to(["read"]),
+      allow.groupsDefinedIn("reviewerGroup").to(["read", "update"]),
+      allow.groupsDefinedIn("adminGroup"),
+    ]),
 
   // UserReview entity - tracks what each user has reviewed (audit trail)
   Box2CloudUserReview: a
@@ -164,12 +189,20 @@ const schema = a.schema({
       setId: a.string().required(),
       pageNumber: a.integer().required(),
       decision: a.enum(["shred", "unsure", "retain"]),
+      viewerGroup: a.string(),
+      reviewerGroup: a.string(),
+      adminGroup: a.string(),
     })
     .secondaryIndexes((index) => [
       index("userId").name("byUser"),
       index("tenantId").name("byTenant"),
     ])
-    .authorization((allow) => [allow.authenticated()]),
+    .authorization((allow) => [
+      allow.groups(["admin"]),
+      allow.groupsDefinedIn("viewerGroup").to(["read"]),
+      allow.groupsDefinedIn("reviewerGroup").to(["read", "create"]),
+      allow.groupsDefinedIn("adminGroup"),
+    ]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
