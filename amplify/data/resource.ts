@@ -1,9 +1,4 @@
-import { type ClientSchema, a, defineData, defineFunction } from "@aws-amplify/backend";
-
-// Import the Lambda function for generating pre-signed URLs
-const getPageImageUrlFunction = defineFunction({
-  entry: "../functions/getPageImageUrl/handler.ts",
-});
+import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 
 /**
  * Box to Cloud - Page Retention Review Application
@@ -197,23 +192,6 @@ const schema = a.schema({
       allow.groups(["admin"]),
       allow.groupsDefinedIn("groups"),
     ]),
-
-  // Custom query to generate pre-signed S3 URLs for page images
-  // This ensures users can only access images they're authorized to view
-  getPageImageUrl: a
-    .query()
-    .arguments({
-      s3Key: a.string().required(),
-      tenantId: a.string().required(),
-    })
-    .returns(
-      a.customType({
-        url: a.string(),
-        error: a.string(),
-      })
-    )
-    .authorization((allow) => [allow.authenticated()])
-    .handler(a.handler.function(getPageImageUrlFunction)),
 });
 
 export type Schema = ClientSchema<typeof schema>;

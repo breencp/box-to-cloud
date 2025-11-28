@@ -284,7 +284,7 @@ export function ReviewPage() {
     <div className="flex h-full flex-1">
       {/* Left side - Image (maximum real estate) */}
       <div className="flex-1 flex items-center justify-center overflow-auto bg-gray-50 dark:bg-gray-900 p-4">
-        <PageImage s3Key={currentPage.s3Key} tenantId={currentPage.tenantId} filename={currentPage.filename} />
+        <PageImage s3Key={currentPage.s3Key} filename={currentPage.filename} />
       </div>
 
       {/* Right side - Context and Controls */}
