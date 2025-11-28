@@ -153,7 +153,7 @@ export function ReviewPage() {
       // Create user review record (audit trail)
       await client.models.Box2CloudUserReview.create({
         userId,
-        tenantId: TENANT_ID,
+        tenantId: currentPage.tenantId,
         pageId: currentPage.pageId,
         boxNumber: currentPage.boxNumber || "",
         setId: currentPage.setId || "",
