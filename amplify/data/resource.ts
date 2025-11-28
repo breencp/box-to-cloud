@@ -7,7 +7,26 @@ import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
  * All model names prefixed with "Box2Cloud" for easy identification in AWS Console.
  */
 
+// Enum definitions
+const UserTitle = a.enum([
+  "president",
+  "vice_president",
+  "secretary",
+  "treasurer",
+  "director",
+  "member",
+]);
+
+const UserTenantRole = a.enum(["viewer", "reviewer", "admin"]);
+
+const InviteStatus = a.enum(["pending", "accepted", "expired", "revoked"]);
+
 const schema = a.schema({
+  // Expose enums in schema
+  UserTitle,
+  UserTenantRole,
+  InviteStatus,
+
   // Tenant entity - represents an AOAO/building
   Box2CloudTenant: a
     .model({
@@ -26,7 +45,7 @@ const schema = a.schema({
       cognitoId: a.string().required(),
       email: a.string().required(),
       fullName: a.string().required(),
-      title: a.enum(["president", "vice_president", "secretary", "treasurer", "director", "member"]),
+      title: a.ref("UserTitle"),
     })
     .secondaryIndexes((index) => [
       index("cognitoId").name("byCognitoId"),
@@ -43,7 +62,7 @@ const schema = a.schema({
     .model({
       userId: a.id().required(),
       tenantId: a.id().required(),
-      role: a.enum(["viewer", "reviewer", "admin"]).required(),
+      role: a.ref("UserTenantRole").required(),
       isActive: a.boolean().default(true),
     })
     .secondaryIndexes((index) => [
@@ -60,13 +79,13 @@ const schema = a.schema({
     .model({
       email: a.string().required(),
       tenantId: a.id().required(),
-      role: a.enum(["viewer", "reviewer", "admin"]).required(),
+      role: a.ref("UserTenantRole").required(),
       fullName: a.string(),
-      title: a.enum(["president", "vice_president", "secretary", "treasurer", "director", "member"]),
+      title: a.ref("UserTitle"),
       invitedBy: a.string().required(),
       expiresAt: a.datetime().required(),
       acceptedAt: a.datetime(),
-      status: a.enum(["pending", "accepted", "expired", "revoked"]).default("pending"),
+      status: a.ref("InviteStatus"),
     })
     .secondaryIndexes((index) => [
       index("email").name("byEmail"),
