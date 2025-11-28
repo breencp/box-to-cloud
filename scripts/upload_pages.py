@@ -220,12 +220,12 @@ def upload_page_image(s3_client, bucket: str, image, s3_key: str) -> bool:
     return True
 
 
-def get_tenant_groups(tenant_id: str) -> dict:
-    """Generate group names for a tenant."""
-    return {
-        "tenantViewerGroup": f"tenant_{tenant_id}_viewer",
-        "tenantReviewerGroup": f"tenant_{tenant_id}_reviewer",
-    }
+def get_tenant_groups(tenant_id: str) -> list:
+    """Generate list of group names for a tenant (both viewer and reviewer)."""
+    return [
+        f"tenant_{tenant_id}_viewer",
+        f"tenant_{tenant_id}_reviewer",
+    ]
 
 
 def get_or_create_box(dynamodb, table_name: str, box_number: str) -> str:
@@ -252,6 +252,7 @@ def get_or_create_box(dynamodb, table_name: str, box_number: str) -> str:
             "id": box_id,
             "boxNumber": box_number,
             "tenantId": TENANT_ID,
+            "groups": groups,  # Array of group names for authorization
             "totalSets": 0,
             "totalPages": 0,
             "pagesReviewed": 0,
@@ -259,8 +260,6 @@ def get_or_create_box(dynamodb, table_name: str, box_number: str) -> str:
             "pagesUnsure": 0,
             "pagesRetain": 0,
             "status": "pending",
-            "tenantViewerGroup": groups["tenantViewerGroup"],
-            "tenantReviewerGroup": groups["tenantReviewerGroup"],
             "createdAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "updatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         })
@@ -330,11 +329,10 @@ def create_set(dynamodb, table_name: str, set_id: str, box_id: str,
         "setId": set_id,
         "boxId": box_id,
         "tenantId": TENANT_ID,
+        "groups": groups,  # Array of group names for authorization
         "filename": filename,
         "pageCount": page_count,
         "pagesReviewed": 0,
-        "tenantViewerGroup": groups["tenantViewerGroup"],
-        "tenantReviewerGroup": groups["tenantReviewerGroup"],
         "createdAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "updatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     })
@@ -353,12 +351,11 @@ def create_page(dynamodb, table_name: str, page_id: str, set_id: str,
         "setId": set_id,
         "boxId": box_id,
         "tenantId": TENANT_ID,
+        "groups": groups,  # Array of group names for authorization
         "pageNumber": page_number,
         "filename": filename,
         "s3Key": s3_key,
         "reviewStatus": "pending",
-        "tenantViewerGroup": groups["tenantViewerGroup"],
-        "tenantReviewerGroup": groups["tenantReviewerGroup"],
         "createdAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "updatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     })

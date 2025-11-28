@@ -100,13 +100,14 @@ const schema = a.schema({
     ]),
 
   // Box entity - represents a physical box of scanned documents
-  // Authorization: tenant viewers can read, tenant reviewers can read/update
+  // Authorization: admins have full access, tenant groups have read/update based on role
   Box2CloudBox: a
     .model({
       boxNumber: a.string().required(),
-      tenantId: a.id().required(),
-      tenantViewerGroup: a.string(), // Used by groupsDefinedIn for authorization
-      tenantReviewerGroup: a.string(), // Used by groupsDefinedIn for authorization
+      tenantId: a.string().required(),
+      // Groups field for dynamic authorization - stores array of group names that can access this record
+      // e.g., ["tenant_wth_viewer", "tenant_wth_reviewer"]
+      groups: a.string().array(),
       totalSets: a.integer().default(0),
       totalPages: a.integer().default(0),
       pagesReviewed: a.integer().default(0),
@@ -119,19 +120,17 @@ const schema = a.schema({
       index("tenantId").sortKeys(["boxNumber"]).name("byTenant"),
     ])
     .authorization((allow) => [
-      allow.groups(["admin"]), // Super admins
-      allow.groupsDefinedIn("tenantViewerGroup").to(["read"]),
-      allow.groupsDefinedIn("tenantReviewerGroup").to(["read", "update"]),
+      allow.groups(["admin"]), // Super admins - full access
+      allow.groupsDefinedIn("groups"), // Dynamic group auth - users in any group listed in the 'groups' field
     ]),
 
   // Set entity - represents a batch of scanned pages (one PDF file)
   Box2CloudSet: a
     .model({
       setId: a.string().required(),
-      boxId: a.id().required(),
+      boxId: a.string().required(),
       tenantId: a.string().required(),
-      tenantViewerGroup: a.string(), // Used by groupsDefinedIn for authorization
-      tenantReviewerGroup: a.string(), // Used by groupsDefinedIn for authorization
+      groups: a.string().array(), // Dynamic authorization groups
       filename: a.string().required(),
       pageCount: a.integer().default(0),
       pagesReviewed: a.integer().default(0),
@@ -142,8 +141,7 @@ const schema = a.schema({
     ])
     .authorization((allow) => [
       allow.groups(["admin"]),
-      allow.groupsDefinedIn("tenantViewerGroup").to(["read"]),
-      allow.groupsDefinedIn("tenantReviewerGroup").to(["read", "update"]),
+      allow.groupsDefinedIn("groups"),
     ]),
 
   // Page entity - represents a single page within a set (primary review entity)
@@ -151,10 +149,9 @@ const schema = a.schema({
     .model({
       pageId: a.string().required(),
       setId: a.string().required(),
-      boxId: a.id().required(),
+      boxId: a.string().required(),
       tenantId: a.string().required(),
-      tenantViewerGroup: a.string(), // Used by groupsDefinedIn for authorization
-      tenantReviewerGroup: a.string(), // Used by groupsDefinedIn for authorization
+      groups: a.string().array(), // Dynamic authorization groups
       pageNumber: a.integer().required(),
       filename: a.string().required(),
       s3Key: a.string().required(),
@@ -172,8 +169,7 @@ const schema = a.schema({
     ])
     .authorization((allow) => [
       allow.groups(["admin"]),
-      allow.groupsDefinedIn("tenantViewerGroup").to(["read"]),
-      allow.groupsDefinedIn("tenantReviewerGroup").to(["read", "update"]),
+      allow.groupsDefinedIn("groups"),
     ]),
 
   // UserReview entity - tracks what each user has reviewed (audit trail)
@@ -181,8 +177,7 @@ const schema = a.schema({
     .model({
       userId: a.string().required(),
       tenantId: a.string().required(),
-      tenantViewerGroup: a.string(), // Used by groupsDefinedIn for authorization
-      tenantReviewerGroup: a.string(), // Used by groupsDefinedIn for authorization
+      groups: a.string().array(), // Dynamic authorization groups
       pageId: a.string().required(),
       boxNumber: a.string().required(),
       setId: a.string().required(),
@@ -195,8 +190,7 @@ const schema = a.schema({
     ])
     .authorization((allow) => [
       allow.groups(["admin"]),
-      allow.groupsDefinedIn("tenantViewerGroup").to(["read"]),
-      allow.groupsDefinedIn("tenantReviewerGroup").to(["read", "create"]),
+      allow.groupsDefinedIn("groups"),
     ]),
 });
 
