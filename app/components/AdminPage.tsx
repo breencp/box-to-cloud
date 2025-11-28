@@ -12,6 +12,7 @@ type Tab = "tenants" | "users" | "invites";
 interface Tenant {
   id: string;
   name: string;
+  groupId: string;
   address?: string;
   isActive: boolean;
 }
@@ -50,7 +51,7 @@ export function AdminPage() {
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
 
   // Form states
-  const [tenantForm, setTenantForm] = useState({ name: "", address: "" });
+  const [tenantForm, setTenantForm] = useState({ name: "", groupId: "", address: "" });
   const [inviteForm, setInviteForm] = useState({
     email: "",
     tenantId: "",
@@ -82,6 +83,7 @@ export function AdminPage() {
       const tenantList = (tenantData || []).map((t) => ({
         id: t.id,
         name: t.name,
+        groupId: t.groupId,
         address: t.address || undefined,
         isActive: t.isActive ?? true,
       }));
@@ -161,19 +163,20 @@ export function AdminPage() {
     ];
   }
 
-  function getTenantGroupForRole(tenantId: string, role: string): string {
+  function getTenantGroupForRole(groupId: string, role: string): string {
     // Map role to group - admin users use reviewer group for data access
     // (super admin access is via the 'admin' Cognito group)
     const groupRole = role === "admin" ? "reviewer" : role;
-    return `tenant_${tenantId}_${groupRole}`;
+    return `tenant_${groupId}_${groupRole}`;
   }
 
   async function handleCreateTenant() {
-    if (!tenantForm.name.trim()) return;
+    if (!tenantForm.name.trim() || !tenantForm.groupId.trim()) return;
 
     try {
       const result = await client.models.Box2CloudTenant.create({
         name: tenantForm.name.trim(),
+        groupId: tenantForm.groupId.trim().toLowerCase(),
         address: tenantForm.address.trim() || undefined,
         isActive: true,
       });
@@ -183,12 +186,12 @@ export function AdminPage() {
         setNewTenantGroups({
           tenantId: result.data.id,
           tenantName: result.data.name,
-          groups: getTenantGroupNames(result.data.id).map((g) => g.name),
+          groups: getTenantGroupNames(result.data.groupId).map((g) => g.name),
         });
       }
 
       setShowTenantModal(false);
-      setTenantForm({ name: "", address: "" });
+      setTenantForm({ name: "", groupId: "", address: "" });
       loadData();
     } catch (err) {
       console.error("Error creating tenant:", err);
@@ -207,7 +210,7 @@ export function AdminPage() {
       });
       setShowTenantModal(false);
       setEditingTenant(null);
-      setTenantForm({ name: "", address: "" });
+      setTenantForm({ name: "", groupId: "", address: "" });
       loadData();
     } catch (err) {
       console.error("Error updating tenant:", err);
@@ -235,7 +238,7 @@ export function AdminPage() {
 
       // Get tenant name for display
       const tenant = tenants.find((t) => t.id === inviteForm.tenantId);
-      const groupName = getTenantGroupForRole(inviteForm.tenantId, inviteForm.role);
+      const groupName = getTenantGroupForRole(tenant?.groupId || "", inviteForm.role);
 
       // Show user creation instructions
       setNewInviteInfo({
@@ -331,7 +334,7 @@ export function AdminPage() {
                 <button
                   onClick={() => {
                     setEditingTenant(null);
-                    setTenantForm({ name: "", address: "" });
+                    setTenantForm({ name: "", groupId: "", address: "" });
                     setShowTenantModal(true);
                   }}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -385,7 +388,7 @@ export function AdminPage() {
                             <button
                               onClick={() => {
                                 setEditingTenant(tenant);
-                                setTenantForm({ name: tenant.name, address: tenant.address || "" });
+                                setTenantForm({ name: tenant.name, groupId: tenant.groupId, address: tenant.address || "" });
                                 setShowTenantModal(true);
                               }}
                               className="text-blue-600 hover:text-blue-800 text-sm"
@@ -568,8 +571,26 @@ export function AdminPage() {
                   value={tenantForm.name}
                   onChange={(e) => setTenantForm({ ...tenantForm, name: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                  placeholder="AOAO Name"
+                  placeholder="Waikiki Townhouse"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Group ID * {!editingTenant && <span className="font-normal text-gray-500">(used in Cognito groups)</span>}
+                </label>
+                <input
+                  type="text"
+                  value={tenantForm.groupId}
+                  onChange={(e) => setTenantForm({ ...tenantForm, groupId: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  placeholder="wth"
+                  disabled={!!editingTenant}
+                />
+                {!editingTenant && tenantForm.groupId && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Groups: tenant_{tenantForm.groupId}_viewer, tenant_{tenantForm.groupId}_reviewer
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

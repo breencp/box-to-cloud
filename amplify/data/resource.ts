@@ -31,9 +31,13 @@ const schema = a.schema({
   Box2CloudTenant: a
     .model({
       name: a.string().required(),
+      groupId: a.string().required(), // Used in Cognito group names: tenant_{groupId}_viewer
       address: a.string(),
       isActive: a.boolean().default(true),
     })
+    .secondaryIndexes((index) => [
+      index("groupId").name("byGroupId"),
+    ])
     .authorization((allow) => [
       allow.groups(["admin"]),
       allow.authenticated().to(["read"]),

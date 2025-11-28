@@ -35,6 +35,8 @@ import boto3
 from pdf2image import convert_from_path
 
 # Configuration - update these after deploying Amplify
+# TENANT_ID should be the groupId from the Tenant record (e.g., "wth" for Waikiki Townhouse)
+# This is used in Cognito group names: tenant_{TENANT_ID}_viewer, tenant_{TENANT_ID}_reviewer
 TENANT_ID = "default"  # Update if multi-tenant
 AWS_REGION = "us-east-1"
 
