@@ -223,7 +223,6 @@ def get_tenant_groups(tenant_id: str) -> dict:
     return {
         "tenantViewerGroup": f"tenant_{tenant_id}_viewer",
         "tenantReviewerGroup": f"tenant_{tenant_id}_reviewer",
-        "tenantAdminGroup": f"tenant_{tenant_id}_admin",
     }
 
 
@@ -260,7 +259,6 @@ def get_or_create_box(dynamodb, table_name: str, box_number: str) -> str:
             "status": "pending",
             "tenantViewerGroup": groups["tenantViewerGroup"],
             "tenantReviewerGroup": groups["tenantReviewerGroup"],
-            "tenantAdminGroup": groups["tenantAdminGroup"],
             "createdAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "updatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         })
@@ -335,7 +333,6 @@ def create_set(dynamodb, table_name: str, set_id: str, box_id: str,
         "pagesReviewed": 0,
         "tenantViewerGroup": groups["tenantViewerGroup"],
         "tenantReviewerGroup": groups["tenantReviewerGroup"],
-        "tenantAdminGroup": groups["tenantAdminGroup"],
         "createdAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "updatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     })
@@ -360,7 +357,6 @@ def create_page(dynamodb, table_name: str, page_id: str, set_id: str,
         "reviewStatus": "pending",
         "tenantViewerGroup": groups["tenantViewerGroup"],
         "tenantReviewerGroup": groups["tenantReviewerGroup"],
-        "tenantAdminGroup": groups["tenantAdminGroup"],
         "createdAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "updatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     })
@@ -453,12 +449,13 @@ def process_pdf(pdf_path: Path, pdf_info: dict, s3_client, dynamodb,
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python upload_pages.py /path/to/scanned/pdfs [--env ENV_ID] [--force]")
-        print("       python upload_pages.py /path/to/file.pdf [--env ENV_ID] [--force]")
+        print("Usage: python upload_pages.py /path/to/scanned/pdfs [OPTIONS]")
+        print("       python upload_pages.py /path/to/file.pdf [OPTIONS]")
         print("\nOptions:")
-        print("  --env ENV_ID  Specify the environment ID (the code between hyphens in table names)")
-        print("  --force       Re-upload files even if they exist in DynamoDB")
-        print("\nOptional environment variables:")
+        print("  --env ENV_ID      Specify the environment ID (the code between hyphens in table names)")
+        print("  --tenant TENANT   Specify the tenant ID (required for multi-tenant setup)")
+        print("  --force           Re-upload files even if they exist in DynamoDB")
+        print("\nEnvironment variables (alternative to options):")
         print("  AWS_REGION - AWS region (default: us-east-1)")
         print("  S3_BUCKET - S3 bucket name (auto-detected from amplify_outputs.json)")
         print("  TENANT_ID - Tenant ID for multi-tenant setup (default: 'default')")
@@ -469,6 +466,7 @@ def main():
     env_id = None
     input_path_str = None
     force_upload = False
+    tenant_id_arg = None
 
     i = 0
     while i < len(args):
@@ -478,6 +476,13 @@ def main():
                 i += 2
             else:
                 print("Error: --env requires an argument")
+                sys.exit(1)
+        elif args[i] == "--tenant":
+            if i + 1 < len(args):
+                tenant_id_arg = args[i + 1]
+                i += 2
+            else:
+                print("Error: --tenant requires an argument")
                 sys.exit(1)
         elif args[i] == "--force":
             force_upload = True
@@ -505,7 +510,9 @@ def main():
 
     global AWS_REGION, TENANT_ID, S3_BUCKET
     AWS_REGION = os.environ.get("AWS_REGION", AWS_REGION)
-    TENANT_ID = os.environ.get("TENANT_ID", TENANT_ID)
+    # Command line --tenant takes precedence over env var
+    TENANT_ID = tenant_id_arg or os.environ.get("TENANT_ID", TENANT_ID)
+    print(f"Using tenant ID: {TENANT_ID}")
 
     # Initialize AWS clients
     session = boto3.Session(region_name=AWS_REGION)

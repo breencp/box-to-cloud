@@ -70,6 +70,13 @@ export function AdminPage() {
     setError(null);
 
     try {
+      // Check if models are available (schema may not be deployed yet)
+      if (!client.models?.Box2CloudTenant) {
+        setError("Database tables not yet deployed. Please deploy the backend first.");
+        setLoading(false);
+        return;
+      }
+
       // Load tenants
       const { data: tenantData } = await client.models.Box2CloudTenant.list();
       const tenantList = (tenantData || []).map((t) => ({
@@ -151,12 +158,14 @@ export function AdminPage() {
     return [
       { name: `tenant_${tenantId}_viewer`, field: "tenantViewerGroup" },
       { name: `tenant_${tenantId}_reviewer`, field: "tenantReviewerGroup" },
-      { name: `tenant_${tenantId}_admin`, field: "tenantAdminGroup" },
     ];
   }
 
   function getTenantGroupForRole(tenantId: string, role: string): string {
-    return `tenant_${tenantId}_${role}`;
+    // Map role to group - admin users use reviewer group for data access
+    // (super admin access is via the 'admin' Cognito group)
+    const groupRole = role === "admin" ? "reviewer" : role;
+    return `tenant_${tenantId}_${groupRole}`;
   }
 
   async function handleCreateTenant() {

@@ -1,11 +1,6 @@
 "use client";
 
-import { Amplify } from "aws-amplify";
-import outputs from "@/amplify_outputs.json";
-import { AppLayout } from "@/app/components";
-import { ReviewPage } from "@/app/components";
-
-Amplify.configure(outputs);
+import { AppLayout, ReviewPage } from "@/app/components";
 
 export default function Home() {
   return (

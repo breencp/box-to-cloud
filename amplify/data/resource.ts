@@ -97,7 +97,7 @@ const schema = a.schema({
 
   // Box entity - represents a physical box of scanned documents
   // Authorization: tenant viewers can read, tenant reviewers can read/update
-  // Note: tenantViewerGroup, tenantReviewerGroup, tenantAdminGroup fields are created implicitly by groupsDefinedIn
+  // Note: tenantViewerGroup, tenantReviewerGroup fields are created implicitly by groupsDefinedIn
   Box2CloudBox: a
     .model({
       boxNumber: a.string().required(),
@@ -117,11 +117,10 @@ const schema = a.schema({
       allow.groups(["admin"]), // Super admins
       allow.groupsDefinedIn("tenantViewerGroup").to(["read"]),
       allow.groupsDefinedIn("tenantReviewerGroup").to(["read", "update"]),
-      allow.groupsDefinedIn("tenantAdminGroup"),
     ]),
 
   // Set entity - represents a batch of scanned pages (one PDF file)
-  // Note: tenantViewerGroup, tenantReviewerGroup, tenantAdminGroup fields are created implicitly by groupsDefinedIn
+  // Note: tenantViewerGroup, tenantReviewerGroup fields are created implicitly by groupsDefinedIn
   Box2CloudSet: a
     .model({
       setId: a.string().required(),
@@ -139,11 +138,10 @@ const schema = a.schema({
       allow.groups(["admin"]),
       allow.groupsDefinedIn("tenantViewerGroup").to(["read"]),
       allow.groupsDefinedIn("tenantReviewerGroup").to(["read", "update"]),
-      allow.groupsDefinedIn("tenantAdminGroup"),
     ]),
 
   // Page entity - represents a single page within a set (primary review entity)
-  // Note: tenantViewerGroup, tenantReviewerGroup, tenantAdminGroup fields are created implicitly by groupsDefinedIn
+  // Note: tenantViewerGroup, tenantReviewerGroup fields are created implicitly by groupsDefinedIn
   Box2CloudPage: a
     .model({
       pageId: a.string().required(),
@@ -169,11 +167,10 @@ const schema = a.schema({
       allow.groups(["admin"]),
       allow.groupsDefinedIn("tenantViewerGroup").to(["read"]),
       allow.groupsDefinedIn("tenantReviewerGroup").to(["read", "update"]),
-      allow.groupsDefinedIn("tenantAdminGroup"),
     ]),
 
   // UserReview entity - tracks what each user has reviewed (audit trail)
-  // Note: tenantViewerGroup, tenantReviewerGroup, tenantAdminGroup fields are created implicitly by groupsDefinedIn
+  // Note: tenantViewerGroup, tenantReviewerGroup fields are created implicitly by groupsDefinedIn
   Box2CloudUserReview: a
     .model({
       userId: a.string().required(),
@@ -192,7 +189,6 @@ const schema = a.schema({
       allow.groups(["admin"]),
       allow.groupsDefinedIn("tenantViewerGroup").to(["read"]),
       allow.groupsDefinedIn("tenantReviewerGroup").to(["read", "create"]),
-      allow.groupsDefinedIn("tenantAdminGroup"),
     ]),
 });
 
