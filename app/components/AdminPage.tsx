@@ -147,11 +147,11 @@ export function AdminPage() {
     groupName: string;
   } | null>(null);
 
-  function getTenantGroupNames(tenantId: string): string[] {
+  function getTenantGroupNames(tenantId: string): { name: string; field: string }[] {
     return [
-      `tenant_${tenantId}_viewer`,
-      `tenant_${tenantId}_reviewer`,
-      `tenant_${tenantId}_admin`,
+      { name: `tenant_${tenantId}_viewer`, field: "tenantViewerGroup" },
+      { name: `tenant_${tenantId}_reviewer`, field: "tenantReviewerGroup" },
+      { name: `tenant_${tenantId}_admin`, field: "tenantAdminGroup" },
     ];
   }
 
@@ -174,7 +174,7 @@ export function AdminPage() {
         setNewTenantGroups({
           tenantId: result.data.id,
           tenantName: result.data.name,
-          groups: getTenantGroupNames(result.data.id),
+          groups: getTenantGroupNames(result.data.id).map((g) => g.name),
         });
       }
 

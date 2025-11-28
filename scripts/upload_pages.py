@@ -221,9 +221,9 @@ def upload_page_image(s3_client, bucket: str, image, s3_key: str) -> bool:
 def get_tenant_groups(tenant_id: str) -> dict:
     """Generate group names for a tenant."""
     return {
-        "viewerGroup": f"tenant_{tenant_id}_viewer",
-        "reviewerGroup": f"tenant_{tenant_id}_reviewer",
-        "adminGroup": f"tenant_{tenant_id}_admin",
+        "tenantViewerGroup": f"tenant_{tenant_id}_viewer",
+        "tenantReviewerGroup": f"tenant_{tenant_id}_reviewer",
+        "tenantAdminGroup": f"tenant_{tenant_id}_admin",
     }
 
 
@@ -258,9 +258,9 @@ def get_or_create_box(dynamodb, table_name: str, box_number: str) -> str:
             "pagesUnsure": 0,
             "pagesRetain": 0,
             "status": "pending",
-            "viewerGroup": groups["viewerGroup"],
-            "reviewerGroup": groups["reviewerGroup"],
-            "adminGroup": groups["adminGroup"],
+            "tenantViewerGroup": groups["tenantViewerGroup"],
+            "tenantReviewerGroup": groups["tenantReviewerGroup"],
+            "tenantAdminGroup": groups["tenantAdminGroup"],
             "createdAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "updatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         })
@@ -333,9 +333,9 @@ def create_set(dynamodb, table_name: str, set_id: str, box_id: str,
         "filename": filename,
         "pageCount": page_count,
         "pagesReviewed": 0,
-        "viewerGroup": groups["viewerGroup"],
-        "reviewerGroup": groups["reviewerGroup"],
-        "adminGroup": groups["adminGroup"],
+        "tenantViewerGroup": groups["tenantViewerGroup"],
+        "tenantReviewerGroup": groups["tenantReviewerGroup"],
+        "tenantAdminGroup": groups["tenantAdminGroup"],
         "createdAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "updatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     })
@@ -358,9 +358,9 @@ def create_page(dynamodb, table_name: str, page_id: str, set_id: str,
         "filename": filename,
         "s3Key": s3_key,
         "reviewStatus": "pending",
-        "viewerGroup": groups["viewerGroup"],
-        "reviewerGroup": groups["reviewerGroup"],
-        "adminGroup": groups["adminGroup"],
+        "tenantViewerGroup": groups["tenantViewerGroup"],
+        "tenantReviewerGroup": groups["tenantReviewerGroup"],
+        "tenantAdminGroup": groups["tenantAdminGroup"],
         "createdAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "updatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     })
