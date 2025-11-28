@@ -1,11 +1,11 @@
-import { defineAuth } from "@aws-amplify/backend";
+import { defineAuth, defineFunction } from "@aws-amplify/backend";
 
 /**
  * Box to Cloud Authentication Configuration
  *
- * Configured for invite-only email-based authentication with Cognito.
+ * Users self-register after being invited via the admin UI.
  * MFA is required using TOTP (authenticator app).
- * Users are invited by admins - no self-registration allowed.
+ * Security is enforced via Cognito groups - users have no access until added to groups.
  *
  * Groups:
  * - admin: Super-admins who can manage all tenants and users
@@ -16,6 +16,11 @@ import { defineAuth } from "@aws-amplify/backend";
  *
  * @see https://docs.amplify.aws/gen2/build-a-backend/auth
  */
+
+const postConfirmation = defineFunction({
+  entry: "../functions/postConfirmation/handler.ts",
+});
+
 export const auth = defineAuth({
   loginWith: {
     email: true,
@@ -39,4 +44,9 @@ export const auth = defineAuth({
     // "tenant_abc_viewer",
     // "tenant_abc_reviewer",
   ],
+  triggers: {
+    postConfirmation,
+  },
 });
+
+export { postConfirmation };

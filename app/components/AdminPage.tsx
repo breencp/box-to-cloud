@@ -7,7 +7,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 const client = generateClient<Schema>();
 
-type Tab = "tenants" | "users" | "invites";
+type Tab = "tenants" | "users";
 
 interface Tenant {
   id: string;
@@ -19,46 +19,44 @@ interface Tenant {
 
 interface User {
   id: string;
+  cognitoId?: string;
   email: string;
   fullName: string;
   title?: string;
+  status: string;
   tenants: { tenantId: string; tenantName: string; role: string }[];
 }
 
-interface Invite {
-  id: string;
-  email: string;
-  tenantId: string;
-  tenantName: string;
-  role: string;
-  fullName?: string;
-  status: string;
-  expiresAt: string;
-}
-
 export function AdminPage() {
-  const { user, isAdmin, isLoading: authLoading } = useAuth();
+  const { isAdmin, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("tenants");
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [invites, setInvites] = useState<Invite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Modal states
   const [showTenantModal, setShowTenantModal] = useState(false);
-  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
 
   // Form states
   const [tenantForm, setTenantForm] = useState({ name: "", groupId: "", address: "" });
-  const [inviteForm, setInviteForm] = useState({
+  const [userForm, setUserForm] = useState({
     email: "",
-    tenantId: "",
-    role: "viewer" as "viewer" | "reviewer" | "admin",
     fullName: "",
-    title: "" as "" | "president" | "vice_president" | "secretary" | "treasurer" | "director" | "member",
+    tenantId: "",
+    role: "viewer" as "viewer" | "reviewer",
+    title: "" as "" | "president" | "vice_president" | "secretary" | "treasurer" | "director",
   });
+
+  // Success message state
+  const [successMessage, setSuccessMessage] = useState<{
+    email: string;
+    tenantName: string;
+    role: string;
+    groupName: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!authLoading && isAdmin) {
@@ -107,32 +105,15 @@ export function AdminPage() {
 
         return {
           id: u.id,
+          cognitoId: u.cognitoId || undefined,
           email: u.email,
           fullName: u.fullName,
           title: u.title || undefined,
+          status: u.status,
           tenants: userTenants,
         };
       });
       setUsers(userList);
-
-      // Load invites
-      const { data: inviteData } = await client.models.Box2CloudInvite.list({
-        filter: { status: { eq: "pending" } },
-      });
-      const inviteList: Invite[] = (inviteData || []).map((i) => {
-        const tenant = tenantList.find((t) => t.id === i.tenantId);
-        return {
-          id: i.id,
-          email: i.email,
-          tenantId: i.tenantId,
-          tenantName: tenant?.name || "Unknown",
-          role: i.role,
-          fullName: i.fullName || undefined,
-          status: i.status || "pending",
-          expiresAt: i.expiresAt,
-        };
-      });
-      setInvites(inviteList);
     } catch (err) {
       console.error("Error loading admin data:", err);
       setError("Failed to load data");
@@ -141,26 +122,15 @@ export function AdminPage() {
     }
   }
 
-  // State for showing user creation instructions after invite
-  const [newInviteInfo, setNewInviteInfo] = useState<{
-    email: string;
-    tenantName: string;
-    role: string;
-    groupName: string;
-  } | null>(null);
-
   function getTenantGroupForRole(groupId: string, role: string): string {
-    // Map role to group - admin users use reviewer group for data access
-    // (super admin access is via the 'admin' Cognito group)
-    const groupRole = role === "admin" ? "reviewer" : role;
-    return `tenant_${groupId}_${groupRole}`;
+    return `tenant_${groupId}_${role}`;
   }
 
   async function handleCreateTenant() {
     if (!tenantForm.name.trim() || !tenantForm.groupId.trim()) return;
 
     try {
-      const result = await client.models.Box2CloudTenant.create({
+      await client.models.Box2CloudTenant.create({
         name: tenantForm.name.trim(),
         groupId: tenantForm.groupId.trim().toLowerCase(),
         address: tenantForm.address.trim() || undefined,
@@ -169,7 +139,7 @@ export function AdminPage() {
 
       setShowTenantModal(false);
       setTenantForm({ name: "", groupId: "", address: "" });
-      loadData();
+      await loadData();
     } catch (err) {
       console.error("Error creating tenant:", err);
       setError("Failed to create tenant");
@@ -188,64 +158,70 @@ export function AdminPage() {
       setShowTenantModal(false);
       setEditingTenant(null);
       setTenantForm({ name: "", groupId: "", address: "" });
-      loadData();
+      await loadData();
     } catch (err) {
       console.error("Error updating tenant:", err);
       setError("Failed to update tenant");
     }
   }
 
-  async function handleCreateInvite() {
-    if (!inviteForm.email.trim() || !inviteForm.tenantId) return;
+  async function handleCreateUser() {
+    if (!userForm.email.trim() || !userForm.fullName.trim() || !userForm.tenantId) return;
 
     try {
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
-
-      await client.models.Box2CloudInvite.create({
-        email: inviteForm.email.trim().toLowerCase(),
-        tenantId: inviteForm.tenantId,
-        role: inviteForm.role,
-        fullName: inviteForm.fullName.trim() || undefined,
-        title: inviteForm.title || undefined,
-        invitedBy: user?.cognitoId || user?.email || "unknown",
-        expiresAt: expiresAt.toISOString(),
+      // Create the user with pending status
+      const { data: newUser } = await client.models.Box2CloudUser.create({
+        email: userForm.email.trim().toLowerCase(),
+        fullName: userForm.fullName.trim(),
+        title: userForm.title || undefined,
         status: "pending",
       });
 
-      // Get tenant name for display
-      const tenant = tenants.find((t) => t.id === inviteForm.tenantId);
-      const groupName = getTenantGroupForRole(tenant?.groupId || "", inviteForm.role);
+      if (!newUser) {
+        setError("Failed to create user");
+        return;
+      }
 
-      // Show user creation instructions
-      setNewInviteInfo({
-        email: inviteForm.email.trim().toLowerCase(),
+      // Create the user-tenant association
+      await client.models.Box2CloudUserTenant.create({
+        userId: newUser.id,
+        tenantId: userForm.tenantId,
+        role: userForm.role,
+        isActive: true,
+      });
+
+      // Get tenant info for success message
+      const tenant = tenants.find((t) => t.id === userForm.tenantId);
+      const groupName = getTenantGroupForRole(tenant?.groupId || "", userForm.role);
+
+      setSuccessMessage({
+        email: userForm.email.trim().toLowerCase(),
         tenantName: tenant?.name || "Unknown",
-        role: inviteForm.role,
+        role: userForm.role,
         groupName,
       });
 
-      setShowInviteModal(false);
-      setInviteForm({ email: "", tenantId: "", role: "viewer", fullName: "", title: "" });
-      loadData();
+      setShowUserModal(false);
+      setUserForm({ email: "", fullName: "", tenantId: "", role: "viewer", title: "" });
+      await loadData();
     } catch (err) {
-      console.error("Error creating invite:", err);
-      setError("Failed to create invite");
+      console.error("Error creating user:", err);
+      setError("Failed to create user");
     }
   }
 
-  async function handleRevokeInvite(inviteId: string) {
-    if (!confirm("Are you sure you want to revoke this invite?")) return;
+  async function handleDisableUser(userId: string) {
+    if (!confirm("Are you sure you want to disable this user?")) return;
 
     try {
-      await client.models.Box2CloudInvite.update({
-        id: inviteId,
-        status: "revoked",
+      await client.models.Box2CloudUser.update({
+        id: userId,
+        status: "disabled",
       });
-      loadData();
+      await loadData();
     } catch (err) {
-      console.error("Error revoking invite:", err);
-      setError("Failed to revoke invite");
+      console.error("Error disabling user:", err);
+      setError("Failed to disable user");
     }
   }
 
@@ -255,6 +231,15 @@ export function AdminPage() {
         ? "text-blue-600 border-blue-600 bg-white dark:bg-gray-800"
         : "text-gray-500 border-transparent hover:text-gray-700"
     }`;
+
+  const statusBadge = (status: string) => {
+    const styles = {
+      pending: "bg-yellow-100 text-yellow-700",
+      active: "bg-green-100 text-green-700",
+      disabled: "bg-gray-100 text-gray-500",
+    };
+    return styles[status as keyof typeof styles] || styles.pending;
+  };
 
   if (authLoading) {
     return (
@@ -274,6 +259,8 @@ export function AdminPage() {
     );
   }
 
+  const pendingUsers = users.filter((u) => u.status === "pending");
+
   return (
     <div className="max-w-6xl mx-auto p-8 max-md:p-4">
       <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-6">
@@ -291,9 +278,11 @@ export function AdminPage() {
         </button>
         <button className={tabClass("users")} onClick={() => setActiveTab("users")}>
           Users ({users.length})
-        </button>
-        <button className={tabClass("invites")} onClick={() => setActiveTab("invites")}>
-          Invites ({invites.length})
+          {pendingUsers.length > 0 && (
+            <span className="ml-2 px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-700 rounded">
+              {pendingUsers.length} pending
+            </span>
+          )}
         </button>
       </div>
 
@@ -330,6 +319,9 @@ export function AdminPage() {
                           Name
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                          Group ID
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
                           Address
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
@@ -348,6 +340,9 @@ export function AdminPage() {
                         >
                           <td className="px-4 py-3 text-gray-900 dark:text-gray-100">
                             {tenant.name}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-sm text-gray-500">
+                            {tenant.groupId}
                           </td>
                           <td className="px-4 py-3 text-gray-500">{tenant.address || "-"}</td>
                           <td className="px-4 py-3">
@@ -385,9 +380,26 @@ export function AdminPage() {
           {/* Users Tab */}
           {activeTab === "users" && (
             <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-                Users
-              </h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                  Users
+                </h3>
+                <button
+                  onClick={() => {
+                    setUserForm({ email: "", fullName: "", tenantId: "", role: "viewer", title: "" });
+                    setShowUserModal(true);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  disabled={tenants.length === 0}
+                >
+                  Invite User
+                </button>
+              </div>
+              {tenants.length === 0 && (
+                <div className="mb-4 p-4 bg-yellow-100 text-yellow-700 rounded-lg">
+                  Create a tenant first before inviting users.
+                </div>
+              )}
               <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                 {users.length === 0 ? (
                   <div className="p-8 text-center text-gray-500">No users yet</div>
@@ -405,29 +417,40 @@ export function AdminPage() {
                           Title
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
                           Tenants
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">
+                          Actions
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {users.map((user) => (
+                      {users.map((u) => (
                         <tr
-                          key={user.id}
+                          key={u.id}
                           className="border-t border-gray-200 dark:border-gray-700"
                         >
                           <td className="px-4 py-3 text-gray-900 dark:text-gray-100">
-                            {user.fullName}
+                            {u.fullName}
                           </td>
-                          <td className="px-4 py-3 text-gray-500">{user.email}</td>
+                          <td className="px-4 py-3 text-gray-500">{u.email}</td>
                           <td className="px-4 py-3 text-gray-500 capitalize">
-                            {user.title?.replace("_", " ") || "-"}
+                            {u.title?.replace("_", " ") || "-"}
                           </td>
                           <td className="px-4 py-3">
-                            {user.tenants.length === 0 ? (
+                            <span className={`text-xs px-2 py-1 rounded ${statusBadge(u.status)}`}>
+                              {u.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {u.tenants.length === 0 ? (
                               <span className="text-gray-400">None</span>
                             ) : (
                               <div className="flex flex-wrap gap-1">
-                                {user.tenants.map((t) => (
+                                {u.tenants.map((t) => (
                                   <span
                                     key={t.tenantId}
                                     className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded"
@@ -438,87 +461,15 @@ export function AdminPage() {
                               </div>
                             )}
                           </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Invites Tab */}
-          {activeTab === "invites" && (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                  Pending Invites
-                </h3>
-                <button
-                  onClick={() => {
-                    setInviteForm({ email: "", tenantId: "", role: "viewer", fullName: "", title: "" });
-                    setShowInviteModal(true);
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  disabled={tenants.length === 0}
-                >
-                  Send Invite
-                </button>
-              </div>
-              {tenants.length === 0 && (
-                <div className="mb-4 p-4 bg-yellow-100 text-yellow-700 rounded-lg">
-                  Create a tenant first before sending invites.
-                </div>
-              )}
-              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                {invites.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">No pending invites</div>
-                ) : (
-                  <table className="w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-900">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                          Email
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                          Name
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                          Tenant
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                          Role
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                          Expires
-                        </th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {invites.map((invite) => (
-                        <tr
-                          key={invite.id}
-                          className="border-t border-gray-200 dark:border-gray-700"
-                        >
-                          <td className="px-4 py-3 text-gray-900 dark:text-gray-100">
-                            {invite.email}
-                          </td>
-                          <td className="px-4 py-3 text-gray-500">{invite.fullName || "-"}</td>
-                          <td className="px-4 py-3 text-gray-500">{invite.tenantName}</td>
-                          <td className="px-4 py-3 text-gray-500 capitalize">{invite.role}</td>
-                          <td className="px-4 py-3 text-gray-500">
-                            {new Date(invite.expiresAt).toLocaleDateString()}
-                          </td>
                           <td className="px-4 py-3 text-right">
-                            <button
-                              onClick={() => handleRevokeInvite(invite.id)}
-                              className="text-red-600 hover:text-red-800 text-sm"
-                            >
-                              Revoke
-                            </button>
+                            {u.status !== "disabled" && (
+                              <button
+                                onClick={() => handleDisableUser(u.id)}
+                                className="text-red-600 hover:text-red-800 text-sm"
+                              >
+                                Disable
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -600,12 +551,12 @@ export function AdminPage() {
         </div>
       )}
 
-      {/* Invite Modal */}
-      {showInviteModal && (
+      {/* User/Invite Modal */}
+      {showUserModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-              Send Invite
+              Invite User
             </h3>
             <div className="space-y-4">
               <div>
@@ -614,20 +565,20 @@ export function AdminPage() {
                 </label>
                 <input
                   type="email"
-                  value={inviteForm.email}
-                  onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                  value={userForm.email}
+                  onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   placeholder="user@example.com"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Full Name
+                  Full Name *
                 </label>
                 <input
                   type="text"
-                  value={inviteForm.fullName}
-                  onChange={(e) => setInviteForm({ ...inviteForm, fullName: e.target.value })}
+                  value={userForm.fullName}
+                  onChange={(e) => setUserForm({ ...userForm, fullName: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   placeholder="John Doe"
                 />
@@ -637,8 +588,8 @@ export function AdminPage() {
                   Tenant *
                 </label>
                 <select
-                  value={inviteForm.tenantId}
-                  onChange={(e) => setInviteForm({ ...inviteForm, tenantId: e.target.value })}
+                  value={userForm.tenantId}
+                  onChange={(e) => setUserForm({ ...userForm, tenantId: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 >
                   <option value="">Select tenant...</option>
@@ -654,18 +605,17 @@ export function AdminPage() {
                   Role *
                 </label>
                 <select
-                  value={inviteForm.role}
+                  value={userForm.role}
                   onChange={(e) =>
-                    setInviteForm({
-                      ...inviteForm,
-                      role: e.target.value as "viewer" | "reviewer" | "admin",
+                    setUserForm({
+                      ...userForm,
+                      role: e.target.value as "viewer" | "reviewer",
                     })
                   }
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 >
                   <option value="viewer">Viewer (read-only)</option>
                   <option value="reviewer">Reviewer (can review pages)</option>
-                  <option value="admin">Admin (can manage tenant)</option>
                 </select>
               </div>
               <div>
@@ -673,11 +623,11 @@ export function AdminPage() {
                   Title
                 </label>
                 <select
-                  value={inviteForm.title}
+                  value={userForm.title}
                   onChange={(e) =>
-                    setInviteForm({
-                      ...inviteForm,
-                      title: e.target.value as typeof inviteForm.title,
+                    setUserForm({
+                      ...userForm,
+                      title: e.target.value as typeof userForm.title,
                     })
                   }
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
@@ -688,92 +638,75 @@ export function AdminPage() {
                   <option value="secretary">Secretary</option>
                   <option value="treasurer">Treasurer</option>
                   <option value="director">Director</option>
-                  <option value="member">Member</option>
                 </select>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button
-                onClick={() => setShowInviteModal(false)}
+                onClick={() => setShowUserModal(false)}
                 className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800"
               >
                 Cancel
               </button>
               <button
-                onClick={handleCreateInvite}
+                onClick={handleCreateUser}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                disabled={!inviteForm.email || !inviteForm.tenantId}
+                disabled={!userForm.email || !userForm.fullName || !userForm.tenantId}
               >
-                Send Invite
+                Create Invite
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* User Creation Instructions Modal */}
-      {newInviteInfo && (
+      {/* Success Message Modal */}
+      {successMessage && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              Invite Created Successfully
+              User Invited Successfully
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Now create the Cognito user and add them to the group:
+              The user has been created with pending status. They can now sign up at your app&apos;s login page.
             </p>
 
             <div className="space-y-3 mb-4">
               <div>
                 <span className="text-sm text-gray-500 dark:text-gray-400">Email:</span>
                 <span className="ml-2 font-mono text-gray-900 dark:text-gray-100">
-                  {newInviteInfo.email}
+                  {successMessage.email}
                 </span>
               </div>
               <div>
                 <span className="text-sm text-gray-500 dark:text-gray-400">Tenant:</span>
                 <span className="ml-2 text-gray-900 dark:text-gray-100">
-                  {newInviteInfo.tenantName}
+                  {successMessage.tenantName}
                 </span>
               </div>
               <div>
                 <span className="text-sm text-gray-500 dark:text-gray-400">Role:</span>
                 <span className="ml-2 text-gray-900 dark:text-gray-100 capitalize">
-                  {newInviteInfo.role}
-                </span>
-              </div>
-              <div>
-                <span className="text-sm text-gray-500 dark:text-gray-400">Group:</span>
-                <span className="ml-2 font-mono text-gray-900 dark:text-gray-100">
-                  {newInviteInfo.groupName}
+                  {successMessage.role}
                 </span>
               </div>
             </div>
 
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              Run these AWS CLI commands:
-            </p>
-            <div className="bg-gray-900 rounded-lg p-4 mb-4 font-mono text-xs text-green-400 overflow-x-auto">
-              <pre>{`# Replace USER_POOL_ID with your Cognito User Pool ID
-
-# 1. Create the user (they will receive an email with temporary password)
-aws cognito-idp admin-create-user \\
-  --user-pool-id USER_POOL_ID \\
-  --username "${newInviteInfo.email}" \\
-  --user-attributes Name=email,Value="${newInviteInfo.email}" Name=email_verified,Value=true \\
-  --desired-delivery-mediums EMAIL
-
-# 2. Add user to the tenant group
-aws cognito-idp admin-add-user-to-group \\
-  --user-pool-id USER_POOL_ID \\
-  --username "${newInviteInfo.email}" \\
-  --group-name "${newInviteInfo.groupName}"`}</pre>
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+                <strong>Next steps:</strong>
+              </p>
+              <ol className="text-sm text-blue-700 dark:text-blue-300 list-decimal list-inside space-y-1">
+                <li>Send the user a link to your app&apos;s sign-up page</li>
+                <li>They will create their account and set up MFA</li>
+                <li>You&apos;ll receive an email notification when they sign up</li>
+                <li>Add them to the Cognito group: <code className="font-mono bg-blue-100 dark:bg-blue-800 px-1 rounded">{successMessage.groupName}</code></li>
+              </ol>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-              Note: You can also create users via the AWS Console under Cognito &gt; User pools &gt; Users.
-            </p>
+
             <div className="flex justify-end">
               <button
-                onClick={() => setNewInviteInfo(null)}
+                onClick={() => setSuccessMessage(null)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 Done

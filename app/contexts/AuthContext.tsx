@@ -14,7 +14,7 @@ import type { Schema } from "@/amplify/data/resource";
 
 const client = generateClient<Schema>();
 
-export type TenantRole = "viewer" | "reviewer" | "admin";
+export type TenantRole = "viewer" | "reviewer";
 
 export interface UserTenant {
   tenantId: string;
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const dbUser = users[0];
         setUser({
           id: dbUser.id,
-          cognitoId: dbUser.cognitoId,
+          cognitoId: dbUser.cognitoId || cognitoId,
           email: dbUser.email,
           fullName: dbUser.fullName,
           title: dbUser.title || undefined,
@@ -188,7 +188,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const roleHierarchy: Record<TenantRole, number> = {
         viewer: 1,
         reviewer: 2,
-        admin: 3,
       };
 
       return roleHierarchy[currentTenant.role] >= roleHierarchy[role];
@@ -197,7 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const canReview = hasRole("reviewer");
-  const canManageTenant = hasRole("admin");
+  const canManageTenant = isAdmin; // Only Cognito admins can manage tenants
 
   return (
     <AuthContext.Provider

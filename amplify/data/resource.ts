@@ -14,18 +14,17 @@ const UserTitle = a.enum([
   "secretary",
   "treasurer",
   "director",
-  "member",
 ]);
 
-const UserTenantRole = a.enum(["viewer", "reviewer", "admin"]);
+const UserTenantRole = a.enum(["viewer", "reviewer"]);
 
-const InviteStatus = a.enum(["pending", "accepted", "expired", "revoked"]);
+const UserStatus = a.enum(["pending", "active", "disabled"]);
 
 const schema = a.schema({
   // Expose enums in schema
   UserTitle,
   UserTenantRole,
-  InviteStatus,
+  UserStatus,
 
   // Tenant entity - represents an AOAO/building
   Box2CloudTenant: a
@@ -44,12 +43,15 @@ const schema = a.schema({
     ]),
 
   // User entity - user profile information
+  // Users are created when invited (status: pending, cognitoId: null)
+  // When they sign up via Cognito, cognitoId is linked and status becomes active
   Box2CloudUser: a
     .model({
-      cognitoId: a.string().required(),
+      cognitoId: a.string(), // null until user signs up via Cognito
       email: a.string().required(),
       fullName: a.string().required(),
       title: a.ref("UserTitle"),
+      status: a.ref("UserStatus").required(),
     })
     .secondaryIndexes((index) => [
       index("cognitoId").name("byCognitoId"),
@@ -70,28 +72,6 @@ const schema = a.schema({
     })
     .secondaryIndexes((index) => [
       index("userId").name("byUser"),
-      index("tenantId").name("byTenant"),
-    ])
-    .authorization((allow) => [
-      allow.groups(["admin"]),
-      allow.authenticated().to(["read"]),
-    ]),
-
-  // Invite entity - pending user invitations
-  Box2CloudInvite: a
-    .model({
-      email: a.string().required(),
-      tenantId: a.id().required(),
-      role: a.ref("UserTenantRole").required(),
-      fullName: a.string(),
-      title: a.ref("UserTitle"),
-      invitedBy: a.string().required(),
-      expiresAt: a.datetime().required(),
-      acceptedAt: a.datetime(),
-      status: a.ref("InviteStatus"),
-    })
-    .secondaryIndexes((index) => [
-      index("email").name("byEmail"),
       index("tenantId").name("byTenant"),
     ])
     .authorization((allow) => [
