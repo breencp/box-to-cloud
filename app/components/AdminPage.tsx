@@ -141,13 +141,6 @@ export function AdminPage() {
     }
   }
 
-  // State for showing group creation instructions
-  const [newTenantGroups, setNewTenantGroups] = useState<{
-    tenantId: string;
-    tenantName: string;
-    groups: string[];
-  } | null>(null);
-
   // State for showing user creation instructions after invite
   const [newInviteInfo, setNewInviteInfo] = useState<{
     email: string;
@@ -155,13 +148,6 @@ export function AdminPage() {
     role: string;
     groupName: string;
   } | null>(null);
-
-  function getTenantGroupNames(tenantId: string): { name: string; field: string }[] {
-    return [
-      { name: `tenant_${tenantId}_viewer`, field: "tenantViewerGroup" },
-      { name: `tenant_${tenantId}_reviewer`, field: "tenantReviewerGroup" },
-    ];
-  }
 
   function getTenantGroupForRole(groupId: string, role: string): string {
     // Map role to group - admin users use reviewer group for data access
@@ -180,15 +166,6 @@ export function AdminPage() {
         address: tenantForm.address.trim() || undefined,
         isActive: true,
       });
-
-      // Show the Cognito groups that need to be created
-      if (result.data) {
-        setNewTenantGroups({
-          tenantId: result.data.id,
-          tenantName: result.data.name,
-          groups: getTenantGroupNames(result.data.groupId).map((g) => g.name),
-        });
-      }
 
       setShowTenantModal(false);
       setTenantForm({ name: "", groupId: "", address: "" });
@@ -728,42 +705,6 @@ export function AdminPage() {
                 disabled={!inviteForm.email || !inviteForm.tenantId}
               >
                 Send Invite
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Group Creation Instructions Modal */}
-      {newTenantGroups && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              Tenant Created Successfully
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Create the following Cognito groups for <strong>{newTenantGroups.tenantName}</strong>:
-            </p>
-            <div className="bg-gray-100 dark:bg-gray-900 rounded-lg p-4 mb-4 font-mono text-sm overflow-x-auto">
-              {newTenantGroups.groups.map((group) => (
-                <div key={group} className="text-gray-800 dark:text-gray-200">
-                  {group}
-                </div>
-              ))}
-            </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              Run these AWS CLI commands to create the groups:
-            </p>
-            <div className="bg-gray-900 rounded-lg p-4 mb-4 font-mono text-xs text-green-400 overflow-x-auto">
-              <pre>{`# Replace USER_POOL_ID with your Cognito User Pool ID
-${newTenantGroups.groups.map((g) => `aws cognito-idp create-group --user-pool-id USER_POOL_ID --group-name "${g}"`).join("\n")}`}</pre>
-            </div>
-            <div className="flex justify-end">
-              <button
-                onClick={() => setNewTenantGroups(null)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Done
               </button>
             </div>
           </div>

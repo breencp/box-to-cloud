@@ -55,6 +55,31 @@ def create_cognito_group(user_pool_id: str, group_name: str) -> bool:
         sys.exit(1)
 
 
+def add_user_to_group(user_pool_id: str, username: str, group_name: str) -> bool:
+    """Add a user to a Cognito group using AWS CLI."""
+    try:
+        result = subprocess.run(
+            [
+                "aws", "cognito-idp", "admin-add-user-to-group",
+                "--user-pool-id", user_pool_id,
+                "--username", username,
+                "--group-name", group_name
+            ],
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode == 0:
+            print(f"  Added {username} to group: {group_name}")
+            return True
+        else:
+            print(f"  Error adding user to group: {result.stderr}")
+            return False
+    except FileNotFoundError:
+        print("Error: AWS CLI not found. Please install and configure the AWS CLI.")
+        sys.exit(1)
+
+
 def main():
     print("=" * 60)
     print("Box to Cloud - Tenant Setup")
@@ -105,6 +130,25 @@ def main():
             sys.exit(1)
 
     print()
+
+    # Ask if user wants to be added to a group
+    print("Do you want to add yourself to one of the tenant groups?")
+    print("  1. Viewer (read-only access)")
+    print("  2. Reviewer (can review pages)")
+    print("  3. Skip (don't add me)")
+    print()
+    role_choice = input("Enter choice (1/2/3): ").strip()
+
+    user_email = None
+    user_role = None
+    if role_choice in ("1", "2"):
+        user_role = "viewer" if role_choice == "1" else "reviewer"
+        user_email = input("Enter your email (Cognito username): ").strip()
+        if not user_email:
+            print("No email provided, skipping user assignment.")
+            user_role = None
+
+    print()
     print("-" * 60)
     print("Creating Cognito groups...")
     print("-" * 60)
@@ -121,6 +165,15 @@ def main():
         if not create_cognito_group(user_pool_id, group):
             all_success = False
 
+    # Add user to group if requested
+    if user_email and user_role and all_success:
+        print()
+        print("-" * 60)
+        print(f"Adding {user_email} to {user_role} group...")
+        print("-" * 60)
+        group_name = f"tenant_{tenant_id}_{user_role}"
+        add_user_to_group(user_pool_id, user_email, group_name)
+
     print()
     print("=" * 60)
     print("NEXT STEPS")
@@ -136,21 +189,11 @@ def main():
         print("2. To upload scanned pages for this tenant, run:")
         print(f"   python upload_pages.py /path/to/pdfs --tenant {tenant_id}")
         print()
-        print("3. To invite users to this tenant:")
-        print(f"   - Go to Admin > Invites > Send Invite")
-        print(f"   - Select the tenant and role (viewer or reviewer)")
-        print()
-        print("4. After creating a user in Cognito, add them to the appropriate group:")
+        print("3. To add other users, run this script again or use:")
         print(f"   aws cognito-idp admin-add-user-to-group \\")
         print(f"     --user-pool-id {user_pool_id} \\")
         print(f"     --username USER_EMAIL \\")
-        print(f"     --group-name tenant_{tenant_id}_viewer")
-        print()
-        print("   Or for reviewers:")
-        print(f"   aws cognito-idp admin-add-user-to-group \\")
-        print(f"     --user-pool-id {user_pool_id} \\")
-        print(f"     --username USER_EMAIL \\")
-        print(f"     --group-name tenant_{tenant_id}_reviewer")
+        print(f"     --group-name tenant_{tenant_id}_viewer  # or _reviewer")
     else:
         print("Some groups failed to create. Please check the errors above")
         print("and try creating them manually in the AWS Console.")

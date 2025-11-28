@@ -101,11 +101,12 @@ const schema = a.schema({
 
   // Box entity - represents a physical box of scanned documents
   // Authorization: tenant viewers can read, tenant reviewers can read/update
-  // Note: tenantViewerGroup, tenantReviewerGroup fields are created implicitly by groupsDefinedIn
   Box2CloudBox: a
     .model({
       boxNumber: a.string().required(),
       tenantId: a.id().required(),
+      tenantViewerGroup: a.string(), // Used by groupsDefinedIn for authorization
+      tenantReviewerGroup: a.string(), // Used by groupsDefinedIn for authorization
       totalSets: a.integer().default(0),
       totalPages: a.integer().default(0),
       pagesReviewed: a.integer().default(0),
@@ -124,12 +125,13 @@ const schema = a.schema({
     ]),
 
   // Set entity - represents a batch of scanned pages (one PDF file)
-  // Note: tenantViewerGroup, tenantReviewerGroup fields are created implicitly by groupsDefinedIn
   Box2CloudSet: a
     .model({
       setId: a.string().required(),
       boxId: a.id().required(),
       tenantId: a.string().required(),
+      tenantViewerGroup: a.string(), // Used by groupsDefinedIn for authorization
+      tenantReviewerGroup: a.string(), // Used by groupsDefinedIn for authorization
       filename: a.string().required(),
       pageCount: a.integer().default(0),
       pagesReviewed: a.integer().default(0),
@@ -145,13 +147,14 @@ const schema = a.schema({
     ]),
 
   // Page entity - represents a single page within a set (primary review entity)
-  // Note: tenantViewerGroup, tenantReviewerGroup fields are created implicitly by groupsDefinedIn
   Box2CloudPage: a
     .model({
       pageId: a.string().required(),
       setId: a.string().required(),
       boxId: a.id().required(),
       tenantId: a.string().required(),
+      tenantViewerGroup: a.string(), // Used by groupsDefinedIn for authorization
+      tenantReviewerGroup: a.string(), // Used by groupsDefinedIn for authorization
       pageNumber: a.integer().required(),
       filename: a.string().required(),
       s3Key: a.string().required(),
@@ -174,11 +177,12 @@ const schema = a.schema({
     ]),
 
   // UserReview entity - tracks what each user has reviewed (audit trail)
-  // Note: tenantViewerGroup, tenantReviewerGroup fields are created implicitly by groupsDefinedIn
   Box2CloudUserReview: a
     .model({
       userId: a.string().required(),
       tenantId: a.string().required(),
+      tenantViewerGroup: a.string(), // Used by groupsDefinedIn for authorization
+      tenantReviewerGroup: a.string(), // Used by groupsDefinedIn for authorization
       pageId: a.string().required(),
       boxNumber: a.string().required(),
       setId: a.string().required(),
