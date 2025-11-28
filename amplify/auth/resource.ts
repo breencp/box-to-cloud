@@ -19,6 +19,7 @@ import { defineAuth, defineFunction } from "@aws-amplify/backend";
 
 const postConfirmation = defineFunction({
   entry: "../functions/postConfirmation/handler.ts",
+  resourceGroupName: "auth",
 });
 
 export const auth = defineAuth({
