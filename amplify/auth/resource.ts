@@ -45,5 +45,3 @@ export const auth = defineAuth({
     postConfirmation,
   },
 });
-
-export { postConfirmation } from "../functions/postConfirmation/resource.js";
