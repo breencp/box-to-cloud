@@ -3,6 +3,7 @@ import {
   DynamoDBClient,
   QueryCommand,
   UpdateItemCommand,
+  ListTablesCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
   CognitoIdentityProviderClient,
@@ -14,12 +15,25 @@ const dynamoClient = new DynamoDBClient({});
 const cognitoClient = new CognitoIdentityProviderClient({});
 const sesClient = new SESClient({});
 
-const USER_TABLE_NAME = process.env.USER_TABLE_NAME!;
-const USER_POOL_ID = process.env.USER_POOL_ID!;
-const SES_FROM_EMAIL = process.env.SES_FROM_EMAIL!;
+// Table name is discovered at runtime since we can't reference data stack during deployment
+let userTableName: string | null = null;
+
+async function getUserTableName(): Promise<string> {
+  if (userTableName) return userTableName;
+
+  const result = await dynamoClient.send(new ListTablesCommand({}));
+  const table = result.TableNames?.find(name => name.includes("Box2CloudUser"));
+  if (!table) {
+    throw new Error("Box2CloudUser table not found");
+  }
+  userTableName = table;
+  return table;
+}
+
+const SES_FROM_EMAIL = "noreply@boxtocloud.com"; // Hardcoded since we can't pass env vars without circular dep
 
 export const handler: PostConfirmationTriggerHandler = async (event) => {
-  const { request } = event;
+  const { userPoolId, request } = event;
   const email = request.userAttributes.email?.toLowerCase();
   const cognitoId = request.userAttributes.sub;
 
@@ -31,10 +45,12 @@ export const handler: PostConfirmationTriggerHandler = async (event) => {
   console.log(`Post-confirmation for user: ${email} (${cognitoId})`);
 
   try {
+    const tableName = await getUserTableName();
+
     // Find pending user by email in DynamoDB
     const queryResult = await dynamoClient.send(
       new QueryCommand({
-        TableName: USER_TABLE_NAME,
+        TableName: tableName,
         IndexName: "byEmail",
         KeyConditionExpression: "email = :email",
         ExpressionAttributeValues: {
@@ -51,7 +67,7 @@ export const handler: PostConfirmationTriggerHandler = async (event) => {
       // Link the Cognito ID and activate the user
       await dynamoClient.send(
         new UpdateItemCommand({
-          TableName: USER_TABLE_NAME,
+          TableName: tableName,
           Key: { id: pendingUser.id },
           UpdateExpression: "SET cognitoId = :cognitoId, #status = :status, updatedAt = :updatedAt",
           ExpressionAttributeNames: {
@@ -68,12 +84,12 @@ export const handler: PostConfirmationTriggerHandler = async (event) => {
       console.log(`Linked user ${email} to cognitoId ${cognitoId}`);
 
       // Notify admins
-      await notifyAdmins(email, pendingUser.fullName?.S || email);
+      await notifyAdmins(userPoolId, email, pendingUser.fullName?.S || email);
     } else {
       console.log(`No pending user found for email ${email}`);
       // User signed up without being invited - they won't have any group access
       // Admin will need to manually add them if appropriate
-      await notifyAdmins(email, email, true);
+      await notifyAdmins(userPoolId, email, email, true);
     }
   } catch (error) {
     console.error("Error in post-confirmation handler:", error);
@@ -84,6 +100,7 @@ export const handler: PostConfirmationTriggerHandler = async (event) => {
 };
 
 async function notifyAdmins(
+  userPoolId: string,
   userEmail: string,
   userName: string,
   uninvited = false
@@ -92,7 +109,7 @@ async function notifyAdmins(
     // Get all users in the admin group
     const adminUsers = await cognitoClient.send(
       new ListUsersInGroupCommand({
-        UserPoolId: USER_POOL_ID,
+        UserPoolId: userPoolId,
         GroupName: "admin",
       })
     );
@@ -116,7 +133,7 @@ async function notifyAdmins(
 
     const body = uninvited
       ? `A new user has signed up without being invited:\n\nEmail: ${userEmail}\n\nThis user has no group access. If they should have access, please add them to the appropriate Cognito groups.`
-      : `A user has completed their account signup:\n\nName: ${userName}\nEmail: ${userEmail}\n\nPlease add them to the appropriate Cognito groups to grant access:\n\naws cognito-idp admin-add-user-to-group \\\n  --user-pool-id ${USER_POOL_ID} \\\n  --username ${userEmail} \\\n  --group-name tenant_XXXX_viewer  # or _reviewer`;
+      : `A user has completed their account signup:\n\nName: ${userName}\nEmail: ${userEmail}\n\nPlease add them to the appropriate Cognito groups to grant access:\n\naws cognito-idp admin-add-user-to-group \\\n  --user-pool-id ${userPoolId} \\\n  --username ${userEmail} \\\n  --group-name tenant_XXXX_viewer  # or _reviewer`;
 
     await sesClient.send(
       new SendEmailCommand({

@@ -3,7 +3,7 @@ import { auth, postConfirmation } from './auth/resource.js';
 import { data } from './data/resource.js';
 import { storage } from './storage/resource.js';
 import { Effect, PolicyStatement } from 'aws-cdk-lib/aws-iam';
-import { Function } from 'aws-cdk-lib/aws-lambda';
+import { Stack } from 'aws-cdk-lib';
 
 const backend = defineBackend({
   auth,
@@ -15,35 +15,40 @@ const backend = defineBackend({
 // Self-registration is allowed - users sign up after being invited
 // Security is enforced via Cognito groups (users have no group access until admin adds them)
 
-// Grant the post-confirmation Lambda access to DynamoDB, Cognito, and SES
-const postConfirmationLambda = backend.postConfirmation.resources.lambda as Function;
+// Get references we need - all from auth stack to avoid circular dependencies
+const authStack = Stack.of(backend.auth.resources.userPool);
+const region = authStack.region;
+const accountId = authStack.account;
 
-// Get the User table name from data resources
-const tables = backend.data.resources.tables;
-const userTable = tables["Box2CloudUser"];
-
-if (userTable) {
-  // Grant DynamoDB access
-  userTable.grantReadWriteData(postConfirmationLambda);
-
-  // Add environment variables
-  postConfirmationLambda.addEnvironment("USER_TABLE_NAME", userTable.tableName);
-}
-
-// Add User Pool ID
-postConfirmationLambda.addEnvironment(
-  "USER_POOL_ID",
-  backend.auth.resources.userPool.userPoolId
+// Grant the post-confirmation Lambda broad DynamoDB access for Box2CloudUser table
+// We use a policy with table name pattern instead of referencing data stack directly
+backend.postConfirmation.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    effect: Effect.ALLOW,
+    actions: [
+      "dynamodb:ListTables", // Needed to discover table name at runtime
+    ],
+    resources: ["*"],
+  })
 );
 
-// Add SES from email (you'll need to verify this in SES)
-postConfirmationLambda.addEnvironment(
-  "SES_FROM_EMAIL",
-  "noreply@boxtocloud.com" // Update this to your verified SES email
+backend.postConfirmation.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    effect: Effect.ALLOW,
+    actions: [
+      "dynamodb:Query",
+      "dynamodb:GetItem",
+      "dynamodb:UpdateItem",
+    ],
+    resources: [
+      `arn:aws:dynamodb:${region}:${accountId}:table/*-Box2CloudUser-*`,
+      `arn:aws:dynamodb:${region}:${accountId}:table/*-Box2CloudUser-*/index/*`,
+    ],
+  })
 );
 
 // Grant Cognito permissions to list admin users
-postConfirmationLambda.addToRolePolicy(
+backend.postConfirmation.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     effect: Effect.ALLOW,
     actions: [
@@ -54,7 +59,7 @@ postConfirmationLambda.addToRolePolicy(
 );
 
 // Grant SES permissions to send emails
-postConfirmationLambda.addToRolePolicy(
+backend.postConfirmation.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     effect: Effect.ALLOW,
     actions: ["ses:SendEmail"],

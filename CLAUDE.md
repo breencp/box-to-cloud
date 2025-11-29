@@ -4,41 +4,52 @@
 
 ### Circular Dependency Fix for Lambda Functions
 
-**IMPORTANT:** When defining Lambda functions that access resources from multiple stacks, you MUST:
-1. Define the function in its own `resource.ts` file (not inline in auth/resource.ts)
-2. Assign it to the appropriate resource group based on what it accesses
+**IMPORTANT:** Circular dependencies occur when stacks reference each other. In this app:
+- `storage` depends on `auth` (via `allow.groups()`)
+- `data` depends on `auth` (via `allow.groups()`)
+- Auth triggers are in `auth` stack
 
+**To avoid circular dependencies:**
+
+1. **Define functions in their own resource.ts file:**
 ```typescript
 // amplify/functions/postConfirmation/resource.ts
 import { defineFunction } from "@aws-amplify/backend";
 
 export const postConfirmation = defineFunction({
   entry: "./handler.ts",
-  resourceGroupName: "data",  // <-- Uses "data" because it accesses DynamoDB tables
+  resourceGroupName: "auth",  // Auth triggers go in auth stack
 });
 ```
 
-Then import and re-export from auth/resource.ts:
+2. **Import and re-export from auth/resource.ts:**
 ```typescript
 // amplify/auth/resource.ts
 import { postConfirmation } from "../functions/postConfirmation/resource.js";
 
 export const auth = defineAuth({
-  // ...
-  triggers: {
-    postConfirmation,
-  },
+  triggers: { postConfirmation },
 });
 
 export { postConfirmation } from "../functions/postConfirmation/resource.js";
 ```
 
-**Resolution rules - assign based on what the function ACCESSES, not what triggers it:**
-1. If your function accesses **DynamoDB tables** (data resources), assign it to the `data` stack: `resourceGroupName: "data"`
-2. If your function accesses **storage** (S3), assign it to the `storage` stack: `resourceGroupName: "storage"`
-3. If your function ONLY accesses **auth resources** and nothing else, assign it to the `auth` stack: `resourceGroupName: "auth"`
+3. **DO NOT reference `backend.data.resources.tables` in backend.ts** - this creates auth → data dependency. Instead:
+   - Use IAM policies with table name patterns: `arn:aws:dynamodb:*:*:table/*-Box2CloudUser-*`
+   - Discover table names at runtime using `ListTables` API
+   - Get `userPoolId` from the Lambda event (Cognito triggers include it)
 
-**Important:** Even if a function is an auth trigger (like `postConfirmation`), if it accesses DynamoDB tables via `backend.data.resources.tables`, it must be assigned to the `data` stack to avoid circular dependencies.
+4. **Use pattern-based IAM policies instead of direct resource references:**
+```typescript
+// backend.ts - CORRECT: No cross-stack references
+backend.postConfirmation.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    effect: Effect.ALLOW,
+    actions: ["dynamodb:Query", "dynamodb:UpdateItem"],
+    resources: [`arn:aws:dynamodb:${region}:${accountId}:table/*-Box2CloudUser-*`],
+  })
+);
+```
 
 ### Adding New Tenants
 
@@ -47,13 +58,18 @@ When adding a new tenant/building to the system, update these files:
 2. `amplify/storage/resource.ts` - Add storage access rules for the tenant path
 3. `scripts/setup_tenant.py` - Follow instructions in the script
 
-### Lambda Environment Variables
+### Lambda Runtime Table Discovery
 
-When a Lambda needs access to other Amplify resources (DynamoDB tables, User Pool, etc.), cast the Lambda to `Function` type to access `addEnvironment`:
-
+Since we can't pass table names as environment variables (circular dependency), discover at runtime:
 ```typescript
-import { Function } from 'aws-cdk-lib/aws-lambda';
+let userTableName: string | null = null;
 
-const myLambda = backend.myFunction.resources.lambda as Function;
-myLambda.addEnvironment("TABLE_NAME", table.tableName);
+async function getUserTableName(): Promise<string> {
+  if (userTableName) return userTableName;
+  const result = await dynamoClient.send(new ListTablesCommand({}));
+  const table = result.TableNames?.find(name => name.includes("Box2CloudUser"));
+  if (!table) throw new Error("Box2CloudUser table not found");
+  userTableName = table;
+  return table;
+}
 ```
