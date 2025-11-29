@@ -7,19 +7,21 @@
 **IMPORTANT:** When defining Lambda functions that are used as auth triggers (like `postConfirmation`), you MUST assign them to the appropriate resource group to avoid CloudFormation circular dependency errors.
 
 ```typescript
-// CORRECT - Assign auth triggers to the "auth" resource group
+// CORRECT - Assign to the stack of the primary resource the function accesses
 const postConfirmation = defineFunction({
   entry: "../functions/postConfirmation/handler.ts",
-  resourceGroupName: "auth",  // <-- REQUIRED for auth triggers
+  resourceGroupName: "data",  // <-- Uses "data" because it accesses DynamoDB tables
 });
 ```
 
-**Resolution rules:**
-1. If your function is defined as an **auth trigger** (postConfirmation, preSignUp, etc.), assign it to the `auth` stack: `resourceGroupName: "auth"`
-2. If your function is used as a **data resolver** or calls the data API, assign it to the `data` stack: `resourceGroupName: "data"`
-3. If your function accesses **storage**, assign it to the `storage` stack: `resourceGroupName: "storage"`
+**Resolution rules - assign based on what the function ACCESSES, not what triggers it:**
+1. If your function accesses **DynamoDB tables** (data resources), assign it to the `data` stack: `resourceGroupName: "data"`
+2. If your function accesses **storage** (S3), assign it to the `storage` stack: `resourceGroupName: "storage"`
+3. If your function ONLY accesses **auth resources** and nothing else, assign it to the `auth` stack: `resourceGroupName: "auth"`
 
-Without `resourceGroupName`, Amplify creates a separate nested stack for each function, which can cause circular dependencies when the function needs access to resources from multiple stacks.
+**Important:** Even if a function is an auth trigger (like `postConfirmation`), if it accesses DynamoDB tables via `backend.data.resources.tables`, it must be assigned to the `data` stack to avoid circular dependencies.
+
+Without `resourceGroupName`, Amplify creates a separate nested stack for each function, which causes circular dependencies when the function needs access to resources from multiple stacks.
 
 ### Adding New Tenants
 

@@ -19,7 +19,7 @@ import { defineAuth, defineFunction } from "@aws-amplify/backend";
 
 const postConfirmation = defineFunction({
   entry: "../functions/postConfirmation/handler.ts",
-  resourceGroupName: "auth",
+  resourceGroupName: "data", // Assigned to data stack because it accesses DynamoDB tables
 });
 
 export const auth = defineAuth({
