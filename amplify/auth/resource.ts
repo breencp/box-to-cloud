@@ -1,4 +1,5 @@
-import { defineAuth, defineFunction } from "@aws-amplify/backend";
+import { defineAuth } from "@aws-amplify/backend";
+import { postConfirmation } from "../functions/postConfirmation/resource.js";
 
 /**
  * Box to Cloud Authentication Configuration
@@ -16,11 +17,6 @@ import { defineAuth, defineFunction } from "@aws-amplify/backend";
  *
  * @see https://docs.amplify.aws/gen2/build-a-backend/auth
  */
-
-const postConfirmation = defineFunction({
-  entry: "../functions/postConfirmation/handler.ts",
-  resourceGroupName: "data", // Assigned to data stack because it accesses DynamoDB tables
-});
 
 export const auth = defineAuth({
   loginWith: {
@@ -50,4 +46,4 @@ export const auth = defineAuth({
   },
 });
 
-export { postConfirmation };
+export { postConfirmation } from "../functions/postConfirmation/resource.js";

@@ -4,14 +4,33 @@
 
 ### Circular Dependency Fix for Lambda Functions
 
-**IMPORTANT:** When defining Lambda functions that are used as auth triggers (like `postConfirmation`), you MUST assign them to the appropriate resource group to avoid CloudFormation circular dependency errors.
+**IMPORTANT:** When defining Lambda functions that access resources from multiple stacks, you MUST:
+1. Define the function in its own `resource.ts` file (not inline in auth/resource.ts)
+2. Assign it to the appropriate resource group based on what it accesses
 
 ```typescript
-// CORRECT - Assign to the stack of the primary resource the function accesses
-const postConfirmation = defineFunction({
-  entry: "../functions/postConfirmation/handler.ts",
+// amplify/functions/postConfirmation/resource.ts
+import { defineFunction } from "@aws-amplify/backend";
+
+export const postConfirmation = defineFunction({
+  entry: "./handler.ts",
   resourceGroupName: "data",  // <-- Uses "data" because it accesses DynamoDB tables
 });
+```
+
+Then import and re-export from auth/resource.ts:
+```typescript
+// amplify/auth/resource.ts
+import { postConfirmation } from "../functions/postConfirmation/resource.js";
+
+export const auth = defineAuth({
+  // ...
+  triggers: {
+    postConfirmation,
+  },
+});
+
+export { postConfirmation } from "../functions/postConfirmation/resource.js";
 ```
 
 **Resolution rules - assign based on what the function ACCESSES, not what triggers it:**
@@ -20,8 +39,6 @@ const postConfirmation = defineFunction({
 3. If your function ONLY accesses **auth resources** and nothing else, assign it to the `auth` stack: `resourceGroupName: "auth"`
 
 **Important:** Even if a function is an auth trigger (like `postConfirmation`), if it accesses DynamoDB tables via `backend.data.resources.tables`, it must be assigned to the `data` stack to avoid circular dependencies.
-
-Without `resourceGroupName`, Amplify creates a separate nested stack for each function, which causes circular dependencies when the function needs access to resources from multiple stacks.
 
 ### Adding New Tenants
 
