@@ -63,25 +63,8 @@ activateUserLambda.addEnvironment(
   backend.data.resources.tables["Box2CloudTenant"].tableName
 );
 
-// Grant the postConfirmation trigger permission to invoke activateUser
-// The postConfirmation Lambda needs to be able to call the activateUser function
-backend.activateUser.resources.lambda.grantInvoke(
-  backend.auth.resources.cfnResources.cfnUserPool
-);
-
-// Also need to grant via a broader policy since the trigger Lambda isn't directly accessible
-// The auth stack will have a Lambda with a role we need to grant
-const activateUserArn = backend.activateUser.resources.lambda.functionArn;
-
-// Add a resource-based policy to allow any Lambda in the account to invoke activateUser
-// This is needed because we can't directly access the postConfirmation Lambda's role
-backend.activateUser.resources.lambda.addPermission('AllowAuthTriggerInvoke', {
+// Allow any Lambda to invoke activateUser (needed for postConfirmation trigger)
+activateUserLambda.addPermission('AllowLambdaInvoke', {
   principal: new iam.ServicePrincipal('lambda.amazonaws.com'),
   action: 'lambda:InvokeFunction',
-  sourceAccount: backend.activateUser.resources.lambda.env.CDK_DEFAULT_ACCOUNT,
 });
-
-// Export the activateUser ARN as a stack output so it can be referenced
-// We'll need to set this as an environment variable on the postConfirmation Lambda manually
-// or through a custom resource after deployment
-console.log("ACTIVATE_USER_FUNCTION_ARN needs to be set on postConfirmation Lambda:", activateUserArn);
