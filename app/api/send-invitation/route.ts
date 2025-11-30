@@ -3,7 +3,7 @@ import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 
 const sesClient = new SESClient({ region: "us-east-1" });
 
-const FROM_EMAIL = "me@christopherbreen.com";
+const FROM_EMAIL = "support@boxtocloud.com";
 
 interface InvitationRequest {
   email: string;

@@ -35,7 +35,7 @@ export const auth = defineAuth({
     // Email configuration - enables SES permissions for auth triggers
     senders: {
         email: {
-            fromEmail: "me@christopherbreen.com",
+            fromEmail: "support@boxtocloud.com",
             fromName: 'Box to Cloud'
         },
     },

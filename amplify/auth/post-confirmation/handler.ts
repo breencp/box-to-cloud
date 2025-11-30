@@ -7,7 +7,7 @@ const lambdaClient = new LambdaClient({ region });
 const sesClient = new SESClient({ region });
 
 const ADMIN_EMAIL = "breencp@gmail.com";
-const FROM_EMAIL = "me@christopherbreen.com";
+const FROM_EMAIL = "support@boxtocloud.com";
 
 // The activateUser function ARN is set via environment variable
 const ACTIVATE_USER_FUNCTION_ARN = process.env.ACTIVATE_USER_FUNCTION_ARN || "";
