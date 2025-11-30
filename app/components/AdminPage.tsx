@@ -60,12 +60,21 @@ export function AdminPage() {
   } | null>(null);
   const [sendingInvite, setSendingInvite] = useState(false);
   const [resendingUserId, setResendingUserId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
     if (!authLoading && isAdmin) {
       loadData();
     }
   }, [authLoading, isAdmin]);
+
+  // Auto-dismiss toast after 4 seconds
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   async function loadData() {
     setLoading(true);
@@ -253,7 +262,7 @@ export function AdminPage() {
 
   async function handleResendInvitation(user: User) {
     if (user.tenants.length === 0) {
-      setError("Cannot resend invitation: user has no tenant assignments");
+      setToast({ message: "Cannot resend invitation: user has no tenant assignments", type: "error" });
       return;
     }
 
@@ -272,14 +281,13 @@ export function AdminPage() {
       });
 
       if (response.ok) {
-        setError(null);
-        alert(`Invitation email resent to ${user.email}`);
+        setToast({ message: `Invitation email resent to ${user.email}`, type: "success" });
       } else {
-        setError("Failed to resend invitation email");
+        setToast({ message: "Failed to resend invitation email", type: "error" });
       }
     } catch (err) {
       console.error("Error resending invitation:", err);
-      setError("Failed to resend invitation email");
+      setToast({ message: "Failed to resend invitation email", type: "error" });
     } finally {
       setResendingUserId(null);
     }
@@ -730,6 +738,27 @@ export function AdminPage() {
                 {sendingInvite ? "Sending..." : "Create & Send Invite"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <div
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg ${
+              toast.type === "success"
+                ? "bg-green-600 text-white"
+                : "bg-red-600 text-white"
+            }`}
+          >
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              className="ml-2 hover:opacity-80"
+            >
+              &times;
+            </button>
           </div>
         </div>
       )}

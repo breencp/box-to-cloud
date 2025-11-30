@@ -1,5 +1,5 @@
 import { defineAuth } from "@aws-amplify/backend";
-import { postConfirmation } from "../functions/postConfirmation/resource.js";
+import { postConfirmation } from "./post-confirmation/resource.js";
 
 /**
  * Box to Cloud Authentication Configuration
@@ -31,6 +31,12 @@ export const auth = defineAuth({
   multifactor: {
     mode: "REQUIRED",
     totp: true,
+  },
+  // Email configuration - enables SES permissions for auth triggers
+  senders: {
+    email: {
+      fromEmail: "noreply@boxtocloud.com",
+    },
   },
   groups: [
     "admin",
