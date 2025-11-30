@@ -1,5 +1,5 @@
-import { defineAuth } from "@aws-amplify/backend";
-import { postConfirmation } from "./post-confirmation/resource.js";
+import {defineAuth} from "@aws-amplify/backend";
+import {postConfirmation} from "./post-confirmation/resource.js";
 
 /**
  * Box to Cloud Authentication Configuration
@@ -19,35 +19,36 @@ import { postConfirmation } from "./post-confirmation/resource.js";
  */
 
 export const auth = defineAuth({
-  loginWith: {
-    email: true,
-  },
-  userAttributes: {
-    email: {
-      required: true,
-      mutable: true,
+    loginWith: {
+        email: true,
     },
-  },
-  multifactor: {
-    mode: "REQUIRED",
-    totp: true,
-  },
-  // Email configuration - enables SES permissions for auth triggers
-  senders: {
-    email: {
-      fromEmail: "noreply@boxtocloud.com",
+    userAttributes: {
+        email: {
+            required: true,
+            mutable: true,
+        },
     },
-  },
-  groups: [
-    "admin",
-    // Waikiki Townhouse
-    "tenant_wth_viewer",
-    "tenant_wth_reviewer",
-    // Add new tenant groups here:
-    // "tenant_abc_viewer",
-    // "tenant_abc_reviewer",
-  ],
-  triggers: {
-    postConfirmation,
-  },
+    multifactor: {
+        mode: "REQUIRED",
+        totp: true,
+    },
+    // Email configuration - enables SES permissions for auth triggers
+    senders: {
+        email: {
+            fromEmail: "me@christopherbreen.com",
+            fromName: 'Box to Cloud'
+        },
+    },
+    groups: [
+        "admin",
+        // Waikiki Townhouse
+        "tenant_wth_viewer",
+        "tenant_wth_reviewer",
+        // Add new tenant groups here:
+        // "tenant_abc_viewer",
+        // "tenant_abc_reviewer",
+    ],
+    triggers: {
+        postConfirmation,
+    },
 });
