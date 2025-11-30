@@ -4,7 +4,7 @@ import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 const sesClient = new SESClient({ region: "us-east-1" });
 
 const ADMIN_EMAIL = "breencp@gmail.com"; // Admin to notify
-const FROM_EMAIL = "noreply@boxtocloud.com"; // Must be verified in SES
+const FROM_EMAIL = "me@christopherbreen.com";
 
 export const handler: PostConfirmationTriggerHandler = async (event) => {
   console.log("Post confirmation trigger executed:", JSON.stringify(event, null, 2));

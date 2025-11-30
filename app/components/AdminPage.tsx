@@ -56,7 +56,10 @@ export function AdminPage() {
     tenantName: string;
     role: string;
     groupName: string;
+    emailSent: boolean;
   } | null>(null);
+  const [sendingInvite, setSendingInvite] = useState(false);
+  const [resendingUserId, setResendingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && isAdmin) {
@@ -168,6 +171,7 @@ export function AdminPage() {
   async function handleCreateUser() {
     if (!userForm.email.trim() || !userForm.fullName.trim() || !userForm.tenantId) return;
 
+    setSendingInvite(true);
     try {
       // Create the user with pending status
       const { data: newUser } = await client.models.Box2CloudUser.create({
@@ -179,6 +183,7 @@ export function AdminPage() {
 
       if (!newUser) {
         setError("Failed to create user");
+        setSendingInvite(false);
         return;
       }
 
@@ -194,11 +199,30 @@ export function AdminPage() {
       const tenant = tenants.find((t) => t.id === userForm.tenantId);
       const groupName = getTenantGroupForRole(tenant?.groupId || "", userForm.role);
 
+      // Send invitation email
+      let emailSent = false;
+      try {
+        const response = await fetch("/api/send-invitation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: userForm.email.trim().toLowerCase(),
+            fullName: userForm.fullName.trim(),
+            tenantName: tenant?.name || "Unknown",
+            role: userForm.role,
+          }),
+        });
+        emailSent = response.ok;
+      } catch (emailErr) {
+        console.error("Failed to send invitation email:", emailErr);
+      }
+
       setSuccessMessage({
         email: userForm.email.trim().toLowerCase(),
         tenantName: tenant?.name || "Unknown",
         role: userForm.role,
         groupName,
+        emailSent,
       });
 
       setShowUserModal(false);
@@ -207,6 +231,8 @@ export function AdminPage() {
     } catch (err) {
       console.error("Error creating user:", err);
       setError("Failed to create user");
+    } finally {
+      setSendingInvite(false);
     }
   }
 
@@ -225,6 +251,40 @@ export function AdminPage() {
     }
   }
 
+  async function handleResendInvitation(user: User) {
+    if (user.tenants.length === 0) {
+      setError("Cannot resend invitation: user has no tenant assignments");
+      return;
+    }
+
+    setResendingUserId(user.id);
+    try {
+      const primaryTenant = user.tenants[0];
+      const response = await fetch("/api/send-invitation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user.email,
+          fullName: user.fullName,
+          tenantName: primaryTenant.tenantName,
+          role: primaryTenant.role,
+        }),
+      });
+
+      if (response.ok) {
+        setError(null);
+        alert(`Invitation email resent to ${user.email}`);
+      } else {
+        setError("Failed to resend invitation email");
+      }
+    } catch (err) {
+      console.error("Error resending invitation:", err);
+      setError("Failed to resend invitation email");
+    } finally {
+      setResendingUserId(null);
+    }
+  }
+
   const tabClass = (tab: Tab) =>
     `px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
       activeTab === tab
@@ -238,7 +298,12 @@ export function AdminPage() {
       active: "bg-green-100 text-green-700",
       disabled: "bg-gray-100 text-gray-500",
     };
-    return styles[status as keyof typeof styles] || styles.pending;
+    return styles[status as keyof typeof styles] || "bg-gray-100 text-gray-500";
+  };
+
+  const normalizeStatus = (status: string | undefined): string => {
+    if (!status) return "pending";
+    return status;
   };
 
   if (authLoading) {
@@ -441,8 +506,8 @@ export function AdminPage() {
                             {u.title?.replace("_", " ") || "-"}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`text-xs px-2 py-1 rounded ${statusBadge(u.status)}`}>
-                              {u.status}
+                            <span className={`text-xs px-2 py-1 rounded ${statusBadge(normalizeStatus(u.status))}`}>
+                              {normalizeStatus(u.status)}
                             </span>
                           </td>
                           <td className="px-4 py-3">
@@ -461,8 +526,17 @@ export function AdminPage() {
                               </div>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-right">
-                            {u.status !== "disabled" && (
+                          <td className="px-4 py-3 text-right space-x-3">
+                            {normalizeStatus(u.status) === "pending" && (
+                              <button
+                                onClick={() => handleResendInvitation(u)}
+                                disabled={resendingUserId === u.id}
+                                className="text-blue-600 hover:text-blue-800 text-sm disabled:opacity-50"
+                              >
+                                {resendingUserId === u.id ? "Sending..." : "Resend Invite"}
+                              </button>
+                            )}
+                            {normalizeStatus(u.status) !== "disabled" && (
                               <button
                                 onClick={() => handleDisableUser(u.id)}
                                 className="text-red-600 hover:text-red-800 text-sm"
@@ -650,10 +724,10 @@ export function AdminPage() {
               </button>
               <button
                 onClick={handleCreateUser}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                disabled={!userForm.email || !userForm.fullName || !userForm.tenantId}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                disabled={!userForm.email || !userForm.fullName || !userForm.tenantId || sendingInvite}
               >
-                Create Invite
+                {sendingInvite ? "Sending..." : "Create & Send Invite"}
               </button>
             </div>
           </div>
@@ -667,9 +741,21 @@ export function AdminPage() {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
               User Invited Successfully
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              The user has been created with pending status. They can now sign up at your app&apos;s login page.
-            </p>
+
+            {/* Email Status */}
+            {successMessage.emailSent ? (
+              <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <p className="text-sm text-green-700 dark:text-green-300">
+                  Invitation email sent to {successMessage.email}
+                </p>
+              </div>
+            ) : (
+              <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                  Could not send invitation email. Please send the signup link manually.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-3 mb-4">
               <div>
@@ -697,8 +783,7 @@ export function AdminPage() {
                 <strong>Next steps:</strong>
               </p>
               <ol className="text-sm text-blue-700 dark:text-blue-300 list-decimal list-inside space-y-1">
-                <li>Send the user a link to your app&apos;s sign-up page</li>
-                <li>They will create their account and set up MFA</li>
+                <li>User creates their account and sets up MFA</li>
                 <li>You&apos;ll receive an email notification when they sign up</li>
                 <li>Add them to the Cognito group: <code className="font-mono bg-blue-100 dark:bg-blue-800 px-1 rounded">{successMessage.groupName}</code></li>
               </ol>
